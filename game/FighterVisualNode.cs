@@ -31,6 +31,8 @@ namespace FirstFighter.Game
         private int _prevStructure;
         private int _prevMeter;
 
+        public FighterMeshMode CurrentMeshMode { get; set; } = FighterMeshMode.MeshyGlbWithGuardStatue;
+
         public void Initialize(bool isPlayerTwoPalette)
         {
             ModelPivot = new Node3D { Name = "ModelPivot" };
@@ -108,6 +110,9 @@ namespace FirstFighter.Game
             SkeletonPose pose = FighterPoseEngine.EvaluateFighterPose(state, matchTick);
             FighterPoseEngine.ApplyPoseToModel(Model, pose);
 
+            bool isNeutralIdle = state.State == FighterStateKind.Idle && state.CurrentMoveId == MoveId.None;
+            Model.SetMeshMode(CurrentMeshMode, inNeutralIdle: isNeutralIdle);
+
             UpdateSmearArc(pose);
             UpdateContactShadows();
             UpdateImpactSparks(state, deltaSec);
@@ -119,11 +124,16 @@ namespace FirstFighter.Game
             float yawDegrees,
             SkeletonPose pose,
             FighterState? optionalBoxState,
-            bool showDebugBoxes)
+            bool showDebugBoxes,
+            FighterMeshMode? overrideMeshMode = null)
         {
             Position = worldPos;
             ModelPivot.RotationDegrees = new Vector3(0f, yawDegrees, 0f);
             FighterPoseEngine.ApplyPoseToModel(Model, pose);
+
+            var mode = overrideMeshMode ?? CurrentMeshMode;
+            Model.SetMeshMode(mode, inNeutralIdle: false);
+
             UpdateSmearArc(pose);
             UpdateContactShadows();
             _sparkBurstInstance.Visible = false;

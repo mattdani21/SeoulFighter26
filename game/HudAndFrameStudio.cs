@@ -27,6 +27,7 @@ namespace FirstFighter.Game
         private bool _inspectorActive;
         private int _inspectorMoveIndex;
         private int _inspectorTick;
+        private FighterMeshMode _meshMode = FighterMeshMode.MeshyGlbWithGuardStatue;
 
         public override void _Ready()
         {
@@ -41,7 +42,8 @@ namespace FirstFighter.Game
             DummyBehaviorMode dummyMode,
             bool inspectorActive,
             int inspectorMoveIndex,
-            int inspectorTick)
+            int inspectorTick,
+            FighterMeshMode meshMode)
         {
             _matchState = matchState;
             _showDebugBoxes = showDebugBoxes;
@@ -50,6 +52,7 @@ namespace FirstFighter.Game
             _inspectorActive = inspectorActive;
             _inspectorMoveIndex = inspectorMoveIndex;
             _inspectorTick = inspectorTick;
+            _meshMode = meshMode;
             QueueRedraw();
         }
 
@@ -173,7 +176,8 @@ namespace FirstFighter.Game
                 $"[F1] 3D Boxes: {(_showDebugBoxes ? "ON" : "OFF")}   " +
                 $"[F2] Pause/Step: {(_paused ? "PAUSED (Press F2 to Step +1f, Space to Resume)" : "LIVE 60Hz")}   " +
                 $"[F3] Dummy: {_dummyMode}   " +
-                $"[F4] Golden 11-Hit Combo Demo   " +
+                $"[F4] 11-Hit Combo   " +
+                $"[F8] Model: {_meshMode}   " +
                 $"[F9] Turnaround & 12-Move Studio Inspector";
 
             DrawString(font, new Vector2(leftX, panelTop + 22f),

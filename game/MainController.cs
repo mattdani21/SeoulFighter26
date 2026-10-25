@@ -36,8 +36,9 @@ namespace FirstFighter.Game
         private readonly Queue<FighterButtons> _goldenComboScriptQueue = new Queue<FighterButtons>();
 
         // Key edge tracking
-        private bool _prevF1, _prevF2, _prevF3, _prevF4, _prevF9, _prevSpace, _prevR;
+        private bool _prevF1, _prevF2, _prevF3, _prevF4, _prevF8, _prevF9, _prevSpace, _prevR;
         private bool _prevLeft, _prevRight, _prevUp, _prevDown;
+        private FighterMeshMode _globalMeshMode = FighterMeshMode.MeshyGlbWithGuardStatue;
 
         public override void _Ready()
         {
@@ -119,6 +120,8 @@ namespace FirstFighter.Game
 
         private void SyncPresentation(float deltaSec)
         {
+            P1Visual.CurrentMeshMode = _globalMeshMode;
+            P2Visual.CurrentMeshMode = _globalMeshMode;
             P1Visual.SyncFromSimState(SimState.Fighters[0], SimState.Tick, _showDebugBoxes, deltaSec);
             P2Visual.SyncFromSimState(SimState.Fighters[1], SimState.Tick, _showDebugBoxes, deltaSec);
             Arena.UpdateCameraForMatch(SimState, _turnaroundInspectorActive, deltaSec);
@@ -129,7 +132,8 @@ namespace FirstFighter.Game
                 _dummyMode,
                 _turnaroundInspectorActive,
                 _inspectorMoveIndex,
-                _inspectorTick);
+                _inspectorTick,
+                _globalMeshMode);
         }
 
         private void UpdateTurnaroundInspectorScene(float deltaSec)
@@ -206,7 +210,8 @@ namespace FirstFighter.Game
                 _dummyMode,
                 _turnaroundInspectorActive,
                 _inspectorMoveIndex,
-                _inspectorTick);
+                _inspectorTick,
+                _globalMeshMode);
         }
 
         private void HandleStudioHotkeys()
@@ -215,6 +220,7 @@ namespace FirstFighter.Game
             bool f2 = Input.IsPhysicalKeyPressed(Key.F2);
             bool f3 = Input.IsPhysicalKeyPressed(Key.F3);
             bool f4 = Input.IsPhysicalKeyPressed(Key.F4);
+            bool f8 = Input.IsPhysicalKeyPressed(Key.F8);
             bool f9 = Input.IsPhysicalKeyPressed(Key.F9);
             bool space = Input.IsPhysicalKeyPressed(Key.Space);
             bool rKey = Input.IsPhysicalKeyPressed(Key.R);
@@ -242,6 +248,10 @@ namespace FirstFighter.Game
             if (f4 && !_prevF4)
             {
                 EnqueueGoldenComboShowcase();
+            }
+            if (f8 && !_prevF8)
+            {
+                _globalMeshMode = (FighterMeshMode)(((int)_globalMeshMode + 1) % 3);
             }
             if (f9 && !_prevF9)
             {
@@ -294,6 +304,7 @@ namespace FirstFighter.Game
             _prevF2 = f2;
             _prevF3 = f3;
             _prevF4 = f4;
+            _prevF8 = f8;
             _prevF9 = f9;
             _prevSpace = space;
             _prevR = rKey;
