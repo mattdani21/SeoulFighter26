@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\sim\FirstFighter.Sim.csproj" />
     <Compile Include="..\game\FirstFighterModelBuilder.cs" Link="FirstFighterModelBuilder.cs" />
+    <Compile Include="..\game\ProceduralTextures.cs" Link="ProceduralTextures.cs" />
     <Compile Include="..\game\FighterPoseEngine.cs" Link="FighterPoseEngine.cs" />
     <Compile Include="..\game\MeshyGlbLoader.cs" Link="MeshyGlbLoader.cs" />
     <Reference Include="GodotSharp">

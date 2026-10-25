@@ -6,14 +6,27 @@ namespace FirstFighter.Game
 {
     /// <summary>
     /// Sloclap (Sifu / Absolver) Studio Arena environment matching reference_first_fighter.jpg:
-    /// #867970 warm taupe-grey backdrop, #8e8178 matte studio floor with subtle meter grid lines,
-    /// 3-point directional lighting for crisp flat-shaded facets, and dynamic 2.5D + Super zoom camera.
+    /// #867970 warm taupe-grey backdrop, #8e8178 matte studio floor, 3-point directional lighting
+    /// for crisp flat-shaded facets, and dynamic 2.5D + Super zoom camera.
+    ///
+    /// Surfaces are textured from code (see <see cref="ProceduralTextures"/>): the floor carries
+    /// concrete albedo, aggregate normal and roughness variation with the 1m reference grid baked
+    /// straight into the albedo, and the cyclorama wall carries plaster grain plus a world-space
+    /// grounding fade. Baking the grid into the albedo removes the thin-line geometry that used to
+    /// shimmer and z-fight against the floor plane.
     /// </summary>
     public partial class StudioArenaNode : Node3D
     {
         public static readonly Color BackdropColor = new Color("867970");
         public static readonly Color FloorColor = new Color("8e8178");
-        public static readonly Color GridLineColor = new Color("786c64");
+
+        // The floor plane is 24m x 16m and its texture is authored 1:1 against those extents, so
+        // the baked metre grid stays exactly 1m regardless of camera or UV scale.
+        private const float FloorWidth = 24f;
+        private const float FloorDepth = 16f;
+        private const float WallWidth = 28f;
+        private const float WallHeight = 12f;
+        private const float WallBottomY = -0.5f;
 
         public Camera3D ArenaCamera { get; private set; } = null!;
         private DirectionalLight3D _keyLight = null!;
@@ -84,16 +97,27 @@ namespace FirstFighter.Game
 
         private void BuildStudioFloorAndGrid()
         {
-            // Matte studio floor plane (#8e8178)
+            // Matte studio floor: concrete albedo (metre grid baked in), aggregate normal map and
+            // roughness variation. The texture is authored 1:1 against the plane extents, so no UV
+            // scaling is applied and the grid can never drift out of alignment or alias against
+            // geometry.
             var floorMesh = new PlaneMesh
             {
-                Size = new Vector2(24f, 16f)
+                Size = new Vector2(FloorWidth, FloorDepth)
             };
             var floorMat = new StandardMaterial3D
             {
-                AlbedoColor = FloorColor,
+                // Divided by the texture's mean so the authored palette value lands exactly.
+                AlbedoColor = FloorColor * (1f / ProceduralTextures.FloorMean),
+                AlbedoTexture = ProceduralTextures.StageFloorAlbedo(),
                 Roughness = 0.94f,
-                Metallic = 0.0f
+                Metallic = 0.0f,
+                NormalEnabled = true,
+                NormalTexture = ProceduralTextures.StageFloorNormal(),
+                NormalScale = 0.35f,
+                RoughnessTexture = ProceduralTextures.StageFloorRoughness(),
+                RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red,
+                TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic
             };
             var floorInst = new MeshInstance3D
             {
@@ -103,60 +127,39 @@ namespace FirstFighter.Game
             };
             AddChild(floorInst);
 
-            // Subtle studio backdrop wall cyclorama
+            BuildBackdropWall();
+        }
+
+        private void BuildBackdropWall()
+        {
             var wallMesh = new PlaneMesh
             {
-                Size = new Vector2(28f, 12f)
+                Size = new Vector2(WallWidth, WallHeight)
             };
+
+            // Unshaded, like a lit cyclorama rather than a lit object. The plaster grain and the
+            // grounding fade are baked into the albedo texture (which runs v = 0 at the top edge for
+            // this +90 deg X rotation), so the wall needs no custom shader and its colour is exact:
+            // AlbedoColor is divided by the detail mean, exactly as the character materials are.
             var wallMat = new StandardMaterial3D
             {
-                AlbedoColor = BackdropColor,
+                AlbedoColor = BackdropColor * (1f / ProceduralTextures.WallMean),
+                AlbedoTexture = ProceduralTextures.StageWallAlbedo(),
                 Roughness = 0.96f,
                 Metallic = 0.0f,
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic
             };
+
             var wallInst = new MeshInstance3D
             {
                 Name = "StudioBackdropWall",
                 Mesh = wallMesh,
                 MaterialOverride = wallMat,
-                Position = new Vector3(0f, 5.5f, -3.8f),
+                Position = new Vector3(0f, WallHeight * 0.5f + WallBottomY, -3.8f),
                 RotationDegrees = new Vector3(90f, 0f, 0f)
             };
             AddChild(wallInst);
-
-            // Subtle 1.0m reference grid lines on floor
-            var gridImmediate = new ImmediateMesh();
-            gridImmediate.SurfaceBegin(Mesh.PrimitiveType.Lines);
-            for (int x = -6; x <= 6; x++)
-            {
-                Color c = x == 0 ? GridLineColor.Darkened(0.15f) : GridLineColor;
-                gridImmediate.SurfaceSetColor(c);
-                gridImmediate.SurfaceAddVertex(new Vector3(x * 1.0f, 0.001f, -3.5f));
-                gridImmediate.SurfaceSetColor(c);
-                gridImmediate.SurfaceAddVertex(new Vector3(x * 1.0f, 0.001f,  2.5f));
-            }
-            for (int z = -3; z <= 2; z++)
-            {
-                gridImmediate.SurfaceSetColor(GridLineColor);
-                gridImmediate.SurfaceAddVertex(new Vector3(-6.0f, 0.001f, z * 1.0f));
-                gridImmediate.SurfaceSetColor(GridLineColor);
-                gridImmediate.SurfaceAddVertex(new Vector3( 6.0f, 0.001f, z * 1.0f));
-            }
-            gridImmediate.SurfaceEnd();
-
-            var gridMat = new StandardMaterial3D
-            {
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                VertexColorUseAsAlbedo = true
-            };
-            AddChild(new MeshInstance3D
-            {
-                Name = "MeterGridLines",
-                Mesh = gridImmediate,
-                MaterialOverride = gridMat,
-                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
-            });
         }
 
         private void BuildCameraRig()

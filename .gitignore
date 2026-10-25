@@ -15,3 +15,6 @@
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Generated capture footage (evidence is committed under docs/evidence)
+captures/

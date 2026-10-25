@@ -385,7 +385,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f,  0.065f, 0f), 0.150f, 0.100f, 0.03f, 1.05f, 0.004f),
                 new RingSpec(new Vector3(0f,  0.090f, 0f), 0.144f, 0.096f, 0.00f, 1.04f, 0.002f)
             };
-            AddMeshChild(hipsNode, "PelvisSlacks", CreateFacetedLoftMesh(pelvisRings, slacksColor, sides: 10, roughness: 0.88f));
+            AddMeshChild(hipsNode, "PelvisSlacks", CreateFacetedLoftMesh(pelvisRings, slacksColor, sides: 10, roughness: 0.88f, kind: SurfaceKind.Trouser));
 
             // Crisp tailored waistband & belt loops
             Color waistbandColor = slacksColor.Darkened(0.08f);
@@ -394,7 +394,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, 0.065f, 0f), 0.148f, 0.099f, 0f, 1.04f),
                 new RingSpec(new Vector3(0f, 0.098f, 0f), 0.146f, 0.098f, 0f, 1.04f)
             };
-            AddMeshChild(hipsNode, "TailoredWaistband", CreateFacetedLoftMesh(bandRings, waistbandColor, sides: 10, roughness: 0.85f));
+            AddMeshChild(hipsNode, "TailoredWaistband", CreateFacetedLoftMesh(bandRings, waistbandColor, sides: 10, roughness: 0.85f, kind: SurfaceKind.Trouser));
         }
 
         private static void BuildAbdomenHenley(Node3D abdomenNode, Color shirtColor)
@@ -407,7 +407,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f,  0.12f, 0f), 0.162f, 0.108f,  0.07f, 1.02f, 0.007f),
                 new RingSpec(new Vector3(0f,  0.22f, 0f), 0.176f, 0.114f, -0.05f, 1.02f, 0.006f)
             };
-            AddMeshChild(abdomenNode, "AbdomenHenley", CreateFacetedLoftMesh(rings, shirtColor, sides: 10, roughness: 0.86f));
+            AddMeshChild(abdomenNode, "AbdomenHenley", CreateFacetedLoftMesh(rings, shirtColor, sides: 10, roughness: 0.86f, kind: SurfaceKind.Fabric));
         }
 
         private static void BuildTorsoHenleyAndCollar(Node3D torsoNode, Color shirtColor, Color skinColor)
@@ -421,7 +421,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f,  0.20f, 0.00f),  0.185f, 0.110f, -0.03f, 1.01f, 0.005f),
                 new RingSpec(new Vector3(0f,  0.225f, -0.005f), 0.085f, 0.075f, 0.00f, 1.00f, 0.002f)
             };
-            AddMeshChild(torsoNode, "TorsoHenley", CreateFacetedLoftMesh(chestRings, shirtColor, sides: 10, roughness: 0.85f));
+            AddMeshChild(torsoNode, "TorsoHenley", CreateFacetedLoftMesh(chestRings, shirtColor, sides: 10, roughness: 0.85f, kind: SurfaceKind.Fabric));
 
             // Band-Collar ring around neck base
             var collarRings = new[]
@@ -429,7 +429,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, 0.205f, -0.004f), 0.078f, 0.072f, 0f, 1.0f),
                 new RingSpec(new Vector3(0f, 0.232f, -0.004f), 0.072f, 0.068f, 0f, 1.0f)
             };
-            AddMeshChild(torsoNode, "BandCollar", CreateFacetedLoftMesh(collarRings, shirtColor.Lightened(0.05f), sides: 8, roughness: 0.85f));
+            AddMeshChild(torsoNode, "BandCollar", CreateFacetedLoftMesh(collarRings, shirtColor.Lightened(0.05f), sides: 8, roughness: 0.85f, kind: SurfaceKind.Fabric));
 
             // Open Henley V-Placket Notch exposing muscular golden-tan chest/clavicle triangle on +Z front
             var placketSkinMesh = CreateVPlacketChestWedge(skinColor, shirtColor.Darkened(0.08f));
@@ -469,8 +469,8 @@ namespace FirstFighter.Game
             AddFlatTriangle(st, midR, lapMidR, topR, lapelColor);
             AddFlatTriangle(st, botV, lapMidR, midR, lapelColor);
 
-            st.SetMaterial(CreateFlatFacetMaterial( Colors.White, 0.82f, useVertexColors: true));
-            return st.Commit();
+            st.SetMaterial(CreateFlatFacetMaterial( Colors.White, 0.82f, useVertexColors: true, kind: SurfaceKind.Fabric));
+            return CommitWithTangents(st);
         }
 
         private static void BuildNeck(Node3D neckNode, Color skinColor)
@@ -481,7 +481,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f,  0.04f,  0.000f), 0.053f, 0.054f, 0.04f, 1.03f, 0.002f),
                 new RingSpec(new Vector3(0f,  0.10f,  0.004f), 0.052f, 0.055f, 0.0f, 1.02f, 0.002f)
             };
-            AddMeshChild(neckNode, "MuscularNeck", CreateFacetedLoftMesh(neckRings, skinColor, sides: 8, roughness: 0.78f));
+            AddMeshChild(neckNode, "MuscularNeck", CreateFacetedLoftMesh(neckRings, skinColor, sides: 8, roughness: 0.78f, kind: SurfaceKind.Skin));
         }
 
         private static void BuildHeadAndHair(Node3D headNode, Color skinColor, Color hairColor, Color browColor)
@@ -496,7 +496,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f,  0.195f, -0.004f), 0.066f, 0.084f, 0f, 1.02f, 0.002f),// Upper cranium
                 new RingSpec(new Vector3(0f,  0.220f, -0.010f), 0.032f, 0.042f, 0f, 1.00f, 0.001f) // Crown closure
             };
-            AddMeshChild(headNode, "SculptedHead", CreateFacetedLoftMesh(headRings, skinColor, sides: 8, roughness: 0.76f));
+            AddMeshChild(headNode, "SculptedHead", CreateFacetedLoftMesh(headRings, skinColor, sides: 8, roughness: 0.76f, kind: SurfaceKind.Skin));
 
             // Sculpted nose bridge, ears, dark eyebrows, and focused eyes
             AddMeshChild(headNode, "FacialFeatures", CreateFacialFeaturesMesh(skinColor, browColor));
@@ -534,8 +534,8 @@ namespace FirstFighter.Game
             AddFacetedBox(st, new Vector3(-0.076f, 0.105f, -0.005f), new Vector3(0.012f, 0.038f, 0.022f), new Vector3(0, -0.15f, 0), skinColor.Darkened(0.04f));
             AddFacetedBox(st, new Vector3( 0.076f, 0.105f, -0.005f), new Vector3(0.012f, 0.038f, 0.022f), new Vector3(0,  0.15f, 0), skinColor.Darkened(0.04f));
 
-            st.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.78f, useVertexColors: true));
-            return st.Commit();
+            st.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.78f, useVertexColors: true, kind: SurfaceKind.Skin));
+            return CommitWithTangents(st);
         }
 
         private static ArrayMesh CreateTousledHairMesh(Color hairColor)
@@ -587,8 +587,8 @@ namespace FirstFighter.Game
                 AddHairWedgeLock(st, w.root, w.mid, w.tip, w.width, w.thick, w.shade);
             }
 
-            st.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.88f, useVertexColors: true));
-            return st.Commit();
+            st.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.88f, useVertexColors: true, kind: SurfaceKind.Hair));
+            return CommitWithTangents(st);
         }
 
         private static void BuildShoulderAndUpperArm(Node3D shoulderNode, Node3D upperArmNode, Color shirtColor, bool isLeft)
@@ -601,7 +601,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3( sign * 0.02f,  0.01f, 0f), 0.068f, 0.068f, 0f, 1.02f, 0.003f),
                 new RingSpec(new Vector3( sign * 0.045f, 0.035f, 0f), 0.042f, 0.045f, 0f, 1.0f, 0.002f)
             };
-            AddMeshChild(shoulderNode, "ShoulderCap", CreateFacetedLoftMesh(shoulderRings, shirtColor, sides: 8, roughness: 0.85f));
+            AddMeshChild(shoulderNode, "ShoulderCap", CreateFacetedLoftMesh(shoulderRings, shirtColor, sides: 8, roughness: 0.85f, kind: SurfaceKind.Fabric));
 
             // UpperArm Henley sleeve (0.32m bone length) terminating in a chunky 2-ring folded/rolled cuff (radius 0.064m) at the elbow!
             var sleeveRings = new[]
@@ -614,7 +614,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, -0.315f, 0f), 0.063f, 0.063f,  0.04f, 1.05f, 0.004f),
                 new RingSpec(new Vector3(0f, -0.328f, 0f), 0.048f, 0.048f,  0.00f, 1.00f, 0.002f)
             };
-            AddMeshChild(upperArmNode, "UpperSleeveAndRolledCuff", CreateFacetedLoftMesh(sleeveRings, shirtColor, sides: 8, roughness: 0.86f));
+            AddMeshChild(upperArmNode, "UpperSleeveAndRolledCuff", CreateFacetedLoftMesh(sleeveRings, shirtColor, sides: 8, roughness: 0.86f, kind: SurfaceKind.Fabric));
         }
 
         private static void BuildBareForearm(Node3D lowerArmNode, Color skinColor, bool isLeft)
@@ -628,7 +628,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, -0.18f, 0.001f), 0.040f, 0.039f, twist * 0.5f, 1.05f, 0.002f),
                 new RingSpec(new Vector3(0f, -0.29f, 0f), 0.033f, 0.031f, 0f, 1.02f, 0.001f)          // Bare sinewy wrist
             };
-            AddMeshChild(lowerArmNode, "BareForearm", CreateFacetedLoftMesh(forearmRings, skinColor, sides: 6, roughness: 0.78f));
+            AddMeshChild(lowerArmNode, "BareForearm", CreateFacetedLoftMesh(forearmRings, skinColor, sides: 6, roughness: 0.78f, kind: SurfaceKind.Skin));
         }
 
         private static (MeshInstance3D clenched, MeshInstance3D relaxed) BuildHandMeshes(Node3D fistNode, Color skinColor, bool isLeft)
@@ -653,8 +653,8 @@ namespace FirstFighter.Game
                 new Vector3(0.022f, 0.046f, 0.022f),
                 new Vector3(0.15f, 0f, sign * 0.25f),
                 skinColor.Lightened(0.04f));
-            stClenched.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.78f, useVertexColors: true));
-            var clenchedInst = AddMeshChild(fistNode, "ClenchedFist", stClenched.Commit());
+            stClenched.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.78f, useVertexColors: true, kind: SurfaceKind.Skin));
+            var clenchedInst = AddMeshChild(fistNode, "ClenchedFist", CommitWithTangents(stClenched));
 
             // 2. Relaxed Open Hand for Turnaround FRONT / SIDE / BACK views
             var stRelaxed = new SurfaceTool();
@@ -674,8 +674,8 @@ namespace FirstFighter.Game
                 new Vector3(0.018f, 0.056f, 0.018f),
                 new Vector3(0.25f, 0f, -sign * 0.22f),
                 skinColor.Lightened(0.04f));
-            stRelaxed.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.78f, useVertexColors: true));
-            var relaxedInst = AddMeshChild(fistNode, "RelaxedHand", stRelaxed.Commit());
+            stRelaxed.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.78f, useVertexColors: true, kind: SurfaceKind.Skin));
+            var relaxedInst = AddMeshChild(fistNode, "RelaxedHand", CommitWithTangents(stRelaxed));
             relaxedInst.Visible = false;
 
             return (clenchedInst, relaxedInst);
@@ -691,7 +691,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, -0.32f, 0.002f), 0.070f, 0.074f, -0.02f, 1.16f, 0.003f),
                 new RingSpec(new Vector3(0f, -0.46f, 0f), 0.062f, 0.066f, 0.00f, 1.14f, 0.002f)
             };
-            AddMeshChild(upperLegNode, "TailoredThigh", CreateFacetedLoftMesh(thighRings, slacksColor, sides: 8, roughness: 0.88f));
+            AddMeshChild(upperLegNode, "TailoredThigh", CreateFacetedLoftMesh(thighRings, slacksColor, sides: 8, roughness: 0.88f, kind: SurfaceKind.Trouser));
         }
 
         private static void BuildCroppedCalfAndAnkle(Node3D lowerLegNode, Color slacksColor, Color skinColor, bool isLeft)
@@ -707,7 +707,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, -0.345f, 0f), 0.045f, 0.049f, 0.00f, 1.12f, 0.002f), // Cropped trouser hem at Y = 0.11m
                 new RingSpec(new Vector3(0f, -0.350f, 0f), 0.036f, 0.038f, 0.00f, 1.02f, 0.001f)
             };
-            AddMeshChild(lowerLegNode, "CroppedTrouserCalf", CreateFacetedLoftMesh(calfTrouserRings, slacksColor, sides: 8, roughness: 0.88f));
+            AddMeshChild(lowerLegNode, "CroppedTrouserCalf", CreateFacetedLoftMesh(calfTrouserRings, slacksColor, sides: 8, roughness: 0.88f, kind: SurfaceKind.Trouser));
 
             // Exposed bare ankle skin (local Y = -0.345m down to -0.43m, world Y = 0.11m down to 0.03m inside shoe collar)
             var bareAnkleRings = new[]
@@ -716,7 +716,7 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, -0.390f, 0f), 0.035f, 0.037f, 0f, 1.04f, 0.001f),
                 new RingSpec(new Vector3(0f, -0.430f, 0f), 0.036f, 0.040f, 0f, 1.02f, 0.001f)
             };
-            AddMeshChild(lowerLegNode, "ExposedBareAnkle", CreateFacetedLoftMesh(bareAnkleRings, skinColor, sides: 8, roughness: 0.78f));
+            AddMeshChild(lowerLegNode, "ExposedBareAnkle", CreateFacetedLoftMesh(bareAnkleRings, skinColor, sides: 8, roughness: 0.78f, kind: SurfaceKind.Skin));
         }
 
         private static void BuildSlipOnLoafer(Node3D footNode, Color upperColor, Color soleColor, bool isLeft)
@@ -734,8 +734,8 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, -0.044f,  0.028f), 0.049f, 0.126f, 0f, 1.06f, 0.001f)  // Upper-to-sole welt
             };
             AppendLoftRingsToSurfaceTool(stUpper, loaferUpperRings, upperColor, sides: 8);
-            stUpper.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.86f, useVertexColors: true));
-            AddMeshChild(footNode, "LoaferUpper", stUpper.Commit());
+            stUpper.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.86f, useVertexColors: true, kind: SurfaceKind.Leather));
+            AddMeshChild(footNode, "LoaferUpper", CommitWithTangents(stUpper));
 
             // Contrasting flat rubber sole (#4a433c) from local Y = -0.044m down to -0.060m (floor contact)
             var stSole = new SurfaceTool();
@@ -747,8 +747,8 @@ namespace FirstFighter.Game
                 new RingSpec(new Vector3(0f, -0.061f, 0.028f), 0.010f, 0.020f, 0f, 1.00f)
             };
             AppendLoftRingsToSurfaceTool(stSole, soleRings, soleColor, sides: 8);
-            stSole.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.92f, useVertexColors: true));
-            AddMeshChild(footNode, "LoaferRubberSole", stSole.Commit());
+            stSole.SetMaterial(CreateFlatFacetMaterial(Colors.White, 0.92f, useVertexColors: true, kind: SurfaceKind.Rubber));
+            AddMeshChild(footNode, "LoaferRubberSole", CommitWithTangents(stSole));
         }
 
         /// <summary>
@@ -759,13 +759,14 @@ namespace FirstFighter.Game
             RingSpec[] rings,
             Color baseColor,
             int sides = 8,
-            float roughness = 0.85f)
+            float roughness = 0.85f,
+            SurfaceKind kind = SurfaceKind.None)
         {
             var st = new SurfaceTool();
             st.Begin(Mesh.PrimitiveType.Triangles);
             AppendLoftRingsToSurfaceTool(st, rings, baseColor, sides);
-            st.SetMaterial(CreateFlatFacetMaterial(Colors.White, roughness, useVertexColors: true));
-            return st.Commit();
+            st.SetMaterial(CreateFlatFacetMaterial(Colors.White, roughness, useVertexColors: true, kind: kind));
+            return CommitWithTangents(st);
         }
 
         private static void AppendLoftRingsToSurfaceTool(
@@ -934,17 +935,63 @@ namespace FirstFighter.Game
             {
                 normal = Vector3.Up;
             }
+
+            // Box-projected UVs measured in metres. Every triangle is flat-shaded and unindexed,
+            // so a per-triangle projection seam is hidden by the facet break. Metres (not 0..1)
+            // keep texture density uniform across parts of very different size; each material
+            // then sets Uv1Scale to repeats-per-metre.
+            Vector2 uvA = BoxProjectUv(a, normal);
+            Vector2 uvB = BoxProjectUv(b, normal);
+            Vector2 uvC = BoxProjectUv(c, normal);
+
             st.SetNormal(normal);
             st.SetColor(color);
+            st.SetUV(uvA);
             st.AddVertex(a);
 
             st.SetNormal(normal);
             st.SetColor(color);
+            st.SetUV(uvB);
             st.AddVertex(b);
 
             st.SetNormal(normal);
             st.SetColor(color);
+            st.SetUV(uvC);
             st.AddVertex(c);
+        }
+
+        /// <summary>
+        /// Project a position onto the two axes least aligned with the face normal: the standard
+        /// flat-shaded box mapping. Works for both lofted tubes and boxes.
+        /// </summary>
+        private static Vector2 BoxProjectUv(Vector3 p, Vector3 normal)
+        {
+            float nx = Mathf.Abs(normal.X);
+            float ny = Mathf.Abs(normal.Y);
+            float nz = Mathf.Abs(normal.Z);
+
+            if (ny >= nx && ny >= nz)
+            {
+                return new Vector2(p.X, p.Z);
+            }
+
+            if (nx >= nz)
+            {
+                return new Vector2(p.Z, p.Y);
+            }
+
+            return new Vector2(p.X, p.Y);
+        }
+
+        /// <summary>
+        /// Commit a surface tool into a mesh with tangents. GenerateTangents() needs the UV data
+        /// written per vertex above, and normal mapping needs the tangents, so meshes and
+        /// materials move together.
+        /// </summary>
+        private static ArrayMesh CommitWithTangents(SurfaceTool st)
+        {
+            st.GenerateTangents();
+            return st.Commit();
         }
 
         private static Color ModulateFacetColor(Color c, float delta)
@@ -952,9 +999,13 @@ namespace FirstFighter.Game
             return delta >= 0f ? c.Lightened(delta) : c.Darkened(-delta);
         }
 
-        public static StandardMaterial3D CreateFlatFacetMaterial(Color albedo, float roughness = 0.85f, bool useVertexColors = false)
+        public static StandardMaterial3D CreateFlatFacetMaterial(
+            Color albedo,
+            float roughness = 0.85f,
+            bool useVertexColors = false,
+            SurfaceKind kind = SurfaceKind.None)
         {
-            return new StandardMaterial3D
+            var material = new StandardMaterial3D
             {
                 AlbedoColor = albedo,
                 Roughness = roughness,
@@ -963,6 +1014,32 @@ namespace FirstFighter.Game
                 VertexColorUseAsAlbedo = useVertexColors,
                 CullMode = BaseMaterial3D.CullModeEnum.Disabled
             };
+
+            if (kind == SurfaceKind.None)
+            {
+                return material;
+            }
+
+            // Detail maps are neutral-grey multipliers, so the authored facet palette and the
+            // per-triangle vertex colours stay the authority for hue and value; the texture only
+            // adds the micro-relief and grain that separates cloth from painted plastic.
+            material.AlbedoTexture = ProceduralTextures.DetailAlbedo(kind);
+            // The detail map carries an exact mean of DetailMean, so divide it back out here. This
+            // keeps the authored palette value identical to the untextured build.
+            material.AlbedoColor = albedo * (1f / ProceduralTextures.DetailMean);
+            material.Uv1Scale = Vector3.One * ProceduralTextures.DetailRepeat(kind);
+            material.TextureRepeat = true;
+            material.TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic;
+
+            ImageTexture? normalMap = ProceduralTextures.DetailNormal(kind);
+            if (normalMap != null)
+            {
+                material.NormalEnabled = true;
+                material.NormalTexture = normalMap;
+                material.NormalScale = ProceduralTextures.DetailNormalScale(kind);
+            }
+
+            return material;
         }
 
         private static MeshInstance3D AddMeshChild(Node3D parent, string name, Mesh mesh)
