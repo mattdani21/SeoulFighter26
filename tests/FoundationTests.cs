@@ -449,6 +449,43 @@ namespace FirstFighter.Tests
                 "Branched recovery must over-extend torso forward on whiff (+14 deg) and recoil backward on block (-12 deg).");
         }
 
+        [Fact]
+        public void MeshyGlb_LoadsAndExtractsAll4PanelsAndBindsTo19BoneRig()
+        {
+            // Verify asset exists in assets/ directory
+            string assetPath = Path.Combine(Directory.GetCurrentDirectory(), "assets", "first_fighter_meshy.glb");
+            if (!File.Exists(assetPath))
+            {
+                assetPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "assets", "first_fighter_meshy.glb"));
+            }
+            Assert.True(File.Exists(assetPath), $"Meshy GLB file must exist at {assetPath}");
+
+            // Extract all 4 turnaround panels
+            var panels = MeshyGlbLoader.LoadOrGetTurnaroundPanels(assetPath);
+            Assert.True(panels.FrontVertices.Length > 10000, "Panel 1 (FRONT) must have >10,000 vertices.");
+            Assert.True(panels.FrontIndices.Length > 20000, "Panel 1 (FRONT) must have >20,000 triangle indices.");
+            Assert.True(panels.FrontPanelMesh != null, "FrontPanelMesh must be non-null.");
+            Assert.True(panels.SidePanelMesh != null, "SidePanelMesh must be non-null.");
+            Assert.True(panels.BackPanelMesh != null, "BackPanelMesh must be non-null.");
+            Assert.True(panels.GuardPanelMesh != null, "GuardPanelMesh must be non-null.");
+
+            // Verify normalization: height must be 1.85m tall [0.00 .. 1.85]
+            float minY = float.MaxValue, maxY = float.MinValue;
+            for (int i = 0; i < panels.FrontVertices.Length; i++)
+            {
+                float y = panels.FrontVertices[i].Y;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+            Assert.True(Math.Abs(minY - 0.00f) < 0.001f, $"Panel 1 minY must be 0.00m (was {minY})");
+            Assert.True(Math.Abs(maxY - 1.85f) < 0.001f, $"Panel 1 maxY must be 1.85m (was {maxY})");
+
+            // Verify character model builder incorporates Meshy rig
+            var rig = FirstFighterModelBuilder.BuildCharacterRig(isPlayerTwoPalette: false);
+            Assert.True(rig.MeshyRigRootNode != null, "MeshyRigRootNode must be present on BuiltFighterModel.");
+            Assert.True(rig.MeshyGuardStatueInstance != null, "MeshyGuardStatueInstance must be present on BuiltFighterModel.");
+        }
+
         private static FighterButtons GetSyntheticScriptInput(int tick, int playerIndex)
         {
             int phase = (tick + playerIndex * 19) % 37;

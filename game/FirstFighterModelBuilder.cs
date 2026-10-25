@@ -56,6 +56,13 @@ namespace FirstFighter.Game
         }
     }
 
+    public enum FighterMeshMode : int
+    {
+        MeshyGlbWithGuardStatue = 0,
+        MeshyGlbFullRig = 1,
+        ProceduralRig = 2
+    }
+
     public sealed class BuiltFighterModel
     {
         public Skeleton3D Skeleton { get; init; } = null!;
@@ -65,6 +72,45 @@ namespace FirstFighter.Game
         public MeshInstance3D RightFistClenchedMesh { get; init; } = null!;
         public MeshInstance3D LeftHandRelaxedMesh { get; init; } = null!;
         public MeshInstance3D RightHandRelaxedMesh { get; init; } = null!;
+
+        public Node3D? ProceduralRootNode { get; set; }
+        public Node3D? MeshyRigRootNode { get; set; }
+        public MeshInstance3D? MeshyGuardStatueInstance { get; set; }
+
+        public void SetMeshMode(FighterMeshMode mode, bool inNeutralIdle)
+        {
+            if (ProceduralRootNode == null || MeshyRigRootNode == null) return;
+
+            switch (mode)
+            {
+                case FighterMeshMode.ProceduralRig:
+                    ProceduralRootNode.Visible = true;
+                    MeshyRigRootNode.Visible = false;
+                    if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
+                    break;
+
+                case FighterMeshMode.MeshyGlbFullRig:
+                    ProceduralRootNode.Visible = false;
+                    MeshyRigRootNode.Visible = true;
+                    if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
+                    break;
+
+                case FighterMeshMode.MeshyGlbWithGuardStatue:
+                default:
+                    ProceduralRootNode.Visible = false;
+                    if (inNeutralIdle && MeshyGuardStatueInstance != null)
+                    {
+                        MeshyRigRootNode.Visible = false;
+                        MeshyGuardStatueInstance.Visible = true;
+                    }
+                    else
+                    {
+                        MeshyRigRootNode.Visible = true;
+                        if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
+                    }
+                    break;
+            }
+        }
     }
 
     /// <summary>
@@ -213,46 +259,102 @@ namespace FirstFighter.Game
                 boneNodes[i] = attachmentNode;
             }
 
+            // Containers for mesh mode switching: Procedural vs Meshy GLB
+            var proceduralRoot = new Node3D { Name = "ProceduralRoot" };
+            skeleton.AddChild(proceduralRoot);
+
+            var meshyRoot = new Node3D { Name = "MeshyRigRoot" };
+            skeleton.AddChild(meshyRoot);
+
+            // Per-bone subnodes for procedural geometry
+            var procBoneNodes = new Node3D[BoneCount];
+            // Per-bone subnodes for partitioned Meshy GLB geometry
+            var meshyBoneNodes = new Node3D[BoneCount];
+
+            for (int i = 0; i < BoneCount; i++)
+            {
+                var pSub = new Node3D { Name = "ProcGeom" };
+                boneNodes[i].AddChild(pSub);
+                procBoneNodes[i] = pSub;
+
+                var mSub = new Node3D { Name = "MeshyGeom" };
+                boneNodes[i].AddChild(mSub);
+                meshyBoneNodes[i] = mSub;
+            }
+
             // 1. Pelvis / Hip Sockets & Tailored Waistband (Hips: 0.94m - 1.04m)
-            BuildHipsAndWaistband(boneNodes[(int)FighterBone.Hips], slacksColor);
+            BuildHipsAndWaistband(procBoneNodes[(int)FighterBone.Hips], slacksColor);
 
             // 2. Waist & Tucked Oatmeal Henley Hem (Abdomen: 1.04m - 1.24m)
-            BuildAbdomenHenley(boneNodes[(int)FighterBone.Abdomen], shirtColor);
+            BuildAbdomenHenley(procBoneNodes[(int)FighterBone.Abdomen], shirtColor);
 
             // 3. Broad V-Tapered Chest, Band-Collar Henley & Exposed V-Placket Notch (Torso: 1.24m - 1.53m)
-            BuildTorsoHenleyAndCollar(boneNodes[(int)FighterBone.Torso], shirtColor, SkinBase);
+            BuildTorsoHenleyAndCollar(procBoneNodes[(int)FighterBone.Torso], shirtColor, SkinBase);
 
             // 4. Muscular Neck (Neck: 1.53m - 1.62m)
-            BuildNeck(boneNodes[(int)FighterBone.Neck], SkinBase);
+            BuildNeck(procBoneNodes[(int)FighterBone.Neck], SkinBase);
 
             // 5. Angular 8-Plane Sculpted Head, Brows & 16 Tousled Wedge Hair Locks (Head: 1.62m - 1.85m)
-            BuildHeadAndHair(boneNodes[(int)FighterBone.Head], SkinBase, HairBase, BrowColor);
+            BuildHeadAndHair(procBoneNodes[(int)FighterBone.Head], SkinBase, HairBase, BrowColor);
 
             // 6. Deltoid Caps & Rolled-Cuff Henley Upper Sleeves (ShoulderL/R, UpperArmL/R)
-            BuildShoulderAndUpperArm(boneNodes[(int)FighterBone.ShoulderL], boneNodes[(int)FighterBone.UpperArmL], shirtColor, isLeft: true);
-            BuildShoulderAndUpperArm(boneNodes[(int)FighterBone.ShoulderR], boneNodes[(int)FighterBone.UpperArmR], shirtColor, isLeft: false);
+            BuildShoulderAndUpperArm(procBoneNodes[(int)FighterBone.ShoulderL], procBoneNodes[(int)FighterBone.UpperArmL], shirtColor, isLeft: true);
+            BuildShoulderAndUpperArm(procBoneNodes[(int)FighterBone.ShoulderR], procBoneNodes[(int)FighterBone.UpperArmR], shirtColor, isLeft: false);
 
             // 7. Bare Muscular Forearms (LowerArmL/R)
-            BuildBareForearm(boneNodes[(int)FighterBone.LowerArmL], SkinBase, isLeft: true);
-            BuildBareForearm(boneNodes[(int)FighterBone.LowerArmR], SkinBase, isLeft: false);
+            BuildBareForearm(procBoneNodes[(int)FighterBone.LowerArmL], SkinBase, isLeft: true);
+            BuildBareForearm(procBoneNodes[(int)FighterBone.LowerArmR], SkinBase, isLeft: false);
 
             // 8. Hands / Fists (Clenched Fist for GUARD/combat + Relaxed Open Fingers for Turnaround FRONT/SIDE/BACK)
-            var (fistClenchedL, handRelaxedL) = BuildHandMeshes(boneNodes[(int)FighterBone.FistL], SkinBase, isLeft: true);
-            var (fistClenchedR, handRelaxedR) = BuildHandMeshes(boneNodes[(int)FighterBone.FistR], SkinBase, isLeft: false);
+            var (fistClenchedL, handRelaxedL) = BuildHandMeshes(procBoneNodes[(int)FighterBone.FistL], SkinBase, isLeft: true);
+            var (fistClenchedR, handRelaxedR) = BuildHandMeshes(procBoneNodes[(int)FighterBone.FistR], SkinBase, isLeft: false);
 
             // 9. Tailored Charcoal Trousers with Front/Back Crease Ridge (UpperLegL/R)
-            BuildTailoredThigh(boneNodes[(int)FighterBone.UpperLegL], slacksColor, isLeft: true);
-            BuildTailoredThigh(boneNodes[(int)FighterBone.UpperLegR], slacksColor, isLeft: false);
+            BuildTailoredThigh(procBoneNodes[(int)FighterBone.UpperLegL], slacksColor, isLeft: true);
+            BuildTailoredThigh(procBoneNodes[(int)FighterBone.UpperLegR], slacksColor, isLeft: false);
 
             // 10. Cropped Trouser Calf (82%) + Exposed Bare Ankle Skin (18%, Y = 0.07m - 0.11m) (LowerLegL/R)
-            BuildCroppedCalfAndAnkle(boneNodes[(int)FighterBone.LowerLegL], slacksColor, SkinBase, isLeft: true);
-            BuildCroppedCalfAndAnkle(boneNodes[(int)FighterBone.LowerLegR], slacksColor, SkinBase, isLeft: false);
+            BuildCroppedCalfAndAnkle(procBoneNodes[(int)FighterBone.LowerLegL], slacksColor, SkinBase, isLeft: true);
+            BuildCroppedCalfAndAnkle(procBoneNodes[(int)FighterBone.LowerLegR], slacksColor, SkinBase, isLeft: false);
 
             // 11. Low-Profile Matte Slip-On Loafers with #4a433c Rubber Sole (FootL/R)
-            BuildSlipOnLoafer(boneNodes[(int)FighterBone.FootL], LoaferUpperColor, LoaferSoleColor, isLeft: true);
-            BuildSlipOnLoafer(boneNodes[(int)FighterBone.FootR], LoaferUpperColor, LoaferSoleColor, isLeft: false);
+            BuildSlipOnLoafer(procBoneNodes[(int)FighterBone.FootL], LoaferUpperColor, LoaferSoleColor, isLeft: true);
+            BuildSlipOnLoafer(procBoneNodes[(int)FighterBone.FootR], LoaferUpperColor, LoaferSoleColor, isLeft: false);
 
-            return new BuiltFighterModel
+            // 12. Attach Meshy GLB Partitioned Rig if GLB asset is present
+            MeshInstance3D? guardStatueInst = null;
+            if (MeshyGlbLoader.AssetExists())
+            {
+                try
+                {
+                    MeshyGlbLoader.AttachPartitionedMeshyToSkeleton(
+                        meshyBoneNodes,
+                        shirtColor,
+                        slacksColor,
+                        SkinBase,
+                        HairBase,
+                        BrowColor,
+                        LoaferUpperColor,
+                        LoaferSoleColor);
+
+                    // Also prepare Panel 4 (GUARD) standalone statue for neutral guard stance
+                    var panels = MeshyGlbLoader.LoadOrGetTurnaroundPanels();
+                    guardStatueInst = new MeshInstance3D
+                    {
+                        Name = "MeshyGuardStatue",
+                        Mesh = panels.GuardPanelMesh,
+                        CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+                        Visible = false
+                    };
+                    skeleton.AddChild(guardStatueInst);
+                }
+                catch (Exception ex)
+                {
+                    GD.PrintErr($"Failed to attach Meshy GLB rig: {ex.Message}");
+                }
+            }
+
+            var builtModel = new BuiltFighterModel
             {
                 Skeleton = skeleton,
                 BoneAttachmentNodes = boneNodes,
@@ -260,8 +362,17 @@ namespace FirstFighter.Game
                 LeftFistClenchedMesh = fistClenchedL,
                 RightFistClenchedMesh = fistClenchedR,
                 LeftHandRelaxedMesh = handRelaxedL,
-                RightHandRelaxedMesh = handRelaxedR
+                RightHandRelaxedMesh = handRelaxedR,
+                ProceduralRootNode = proceduralRoot,
+                MeshyRigRootNode = meshyRoot,
+                MeshyGuardStatueInstance = guardStatueInst
             };
+
+            // Default to Meshy GLB mode if loaded, otherwise fallback to procedural rig
+            bool hasMeshy = MeshyGlbLoader.AssetExists();
+            builtModel.SetMeshMode(hasMeshy ? FighterMeshMode.MeshyGlbWithGuardStatue : FighterMeshMode.ProceduralRig, inNeutralIdle: true);
+
+            return builtModel;
         }
 
         private static void BuildHipsAndWaistband(Node3D hipsNode, Color slacksColor)
