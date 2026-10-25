@@ -14,20 +14,21 @@ namespace FirstFighter.Game
     }
 
     /// <summary>
-    /// Renders the Sifu-inspired Top HUD (Health, Structure/Guard Gauge, Super Meter, Combo & Scaling Counter),
-    /// Bottom 60-Tick Color-Coded Frame Meter + Live Frame Advantage (+3 ON HIT, -4 ON BLOCK),
-    /// and the F9 Character Turnaround (FRONT / SIDE / BACK / GUARD) & Move Inspector overlay.
+    /// Match HUD: clean health / structure / meter bars by default.
+    /// F6 training overlay adds the 60-tick frame meter, hotkey legend, and telemetry.
+    /// F9 Character Turnaround & Move Inspector overlay is unchanged.
     /// </summary>
     public partial class HudAndFrameStudio : Control
     {
         private MatchState? _matchState;
-        private bool _showDebugBoxes = true;
+        private bool _showDebugBoxes;
         private bool _paused;
         private DummyBehaviorMode _dummyMode = DummyBehaviorMode.Stand;
         private bool _inspectorActive;
         private int _inspectorMoveIndex;
         private int _inspectorTick;
         private FighterMeshMode _meshMode = FighterMeshMode.MeshyGlbWithGuardStatue;
+        private bool _trainingOverlay;
 
         public override void _Ready()
         {
@@ -43,7 +44,8 @@ namespace FirstFighter.Game
             bool inspectorActive,
             int inspectorMoveIndex,
             int inspectorTick,
-            FighterMeshMode meshMode)
+            FighterMeshMode meshMode,
+            bool trainingOverlay = false)
         {
             _matchState = matchState;
             _showDebugBoxes = showDebugBoxes;
@@ -53,6 +55,7 @@ namespace FirstFighter.Game
             _inspectorMoveIndex = inspectorMoveIndex;
             _inspectorTick = inspectorTick;
             _meshMode = meshMode;
+            _trainingOverlay = trainingOverlay;
             QueueRedraw();
         }
 
@@ -73,7 +76,10 @@ namespace FirstFighter.Game
             }
 
             DrawTopFighterBars(vp, font, _matchState.Fighters[0], _matchState.Fighters[1]);
-            DrawBottomFrameMeterStudio(vp, font, _matchState.Fighters[0], _matchState.Fighters[1]);
+            if (_trainingOverlay)
+            {
+                DrawBottomFrameMeterStudio(vp, font, _matchState.Fighters[0], _matchState.Fighters[1]);
+            }
         }
 
         private void DrawTopFighterBars(Vector2 vp, Font font, FighterState p1, FighterState p2)
@@ -81,18 +87,16 @@ namespace FirstFighter.Game
             var def = FighterCatalog.FirstFighter;
             float marginX = 44f;
             float barWidth = (vp.X * 0.5f) - 110f;
+            float bannerH = _trainingOverlay ? 108f : 88f;
 
-            // Top Banner Background
-            DrawRect(new Rect2(0, 0, vp.X, 108f), new Color(0.11f, 0.10f, 0.09f, 0.72f));
+            DrawRect(new Rect2(0, 0, vp.X, bannerH), new Color(0.08f, 0.09f, 0.11f, 0.68f));
 
-            // P1 Health Bar (Left)
             float p1HpRatio = Mathf.Clamp((float)p1.Health / def.MaxHealth, 0f, 1f);
             Rect2 p1HpBg = new Rect2(marginX, 20f, barWidth, 22f);
             DrawRect(p1HpBg, new Color("221f1c"));
             DrawRect(new Rect2(marginX + barWidth * (1f - p1HpRatio), 20f, barWidth * p1HpRatio, 22f), new Color("d9534f"));
             DrawRect(p1HpBg, new Color("cfc0ae"), filled: false, width: 1.5f);
 
-            // P2 Health Bar (Right)
             float p2Left = vp.X - marginX - barWidth;
             float p2HpRatio = Mathf.Clamp((float)p2.Health / def.MaxHealth, 0f, 1f);
             Rect2 p2HpBg = new Rect2(p2Left, 20f, barWidth, 22f);
@@ -100,7 +104,6 @@ namespace FirstFighter.Game
             DrawRect(new Rect2(p2Left, 20f, barWidth * p2HpRatio, 22f), new Color("4b8bbe"));
             DrawRect(p2HpBg, new Color("cfc0ae"), filled: false, width: 1.5f);
 
-            // Structure / Guard Gauge (Sifu gold bar directly beneath Health)
             float p1StructRatio = Mathf.Clamp((float)p1.Structure / def.MaxStructure, 0f, 1f);
             Rect2 p1StructBg = new Rect2(marginX, 46f, barWidth * 0.75f, 10f);
             DrawRect(p1StructBg, new Color("1c1917"));
@@ -111,7 +114,6 @@ namespace FirstFighter.Game
             DrawRect(p2StructBg, new Color("1c1917"));
             DrawRect(new Rect2(p2StructBg.Position.X, 46f, p2StructBg.Size.X * p2StructRatio, 10f), new Color("e6b84c"));
 
-            // Super Meter Bars
             float p1MeterRatio = Mathf.Clamp((float)p1.Meter / def.MaxMeter, 0f, 1f);
             Rect2 p1MeterBg = new Rect2(marginX, 62f, barWidth * 0.55f, 12f);
             DrawRect(p1MeterBg, new Color("181614"));
@@ -124,39 +126,53 @@ namespace FirstFighter.Game
             DrawRect(new Rect2(p2MeterBg.Position.X, 62f, p2MeterBg.Size.X * p2MeterRatio, 12f),
                 p2.Meter >= 100 ? new Color("56e39f") : new Color("3caea3"));
 
-            // Fighter Labels & Telemetry
-            DrawString(font, new Vector2(marginX, 94f),
-                $"P1 FIRST FIGHTER (OATMEAL HENLEY)   HP:{p1.Health}  STRUCT:{p1.Structure}  METER:{p1.Meter}/100  STATE:{p1.State}",
-                HorizontalAlignment.Left, -1, 14, new Color("efe6dc"));
+            if (_trainingOverlay)
+            {
+                DrawString(font, new Vector2(marginX, 94f),
+                    $"P1 FIRST FIGHTER   HP:{p1.Health}  STRUCT:{p1.Structure}  METER:{p1.Meter}/100  STATE:{p1.State}",
+                    HorizontalAlignment.Left, -1, 13, new Color("efe6dc"));
 
-            DrawString(font, new Vector2(p2Left, 94f),
-                $"P2 MIRROR DUMMY ({_dummyMode.ToString().ToUpper()})   HP:{p2.Health}  STRUCT:{p2.Structure}  METER:{p2.Meter}/100  STATE:{p2.State}",
-                HorizontalAlignment.Left, -1, 14, new Color("efe6dc"));
+                DrawString(font, new Vector2(p2Left, 94f),
+                    $"P2 MIRROR DUMMY ({_dummyMode.ToString().ToUpper()})   HP:{p2.Health}  STRUCT:{p2.Structure}  METER:{p2.Meter}/100  STATE:{p2.State}",
+                    HorizontalAlignment.Left, -1, 13, new Color("efe6dc"));
 
-            // Center Tick Counter
-            DrawString(font, new Vector2(vp.X * 0.5f - 48f, 42f),
-                $"60Hz TICK\n  {_matchState!.Tick:D5}",
-                HorizontalAlignment.Center, -1, 15, new Color("cfc0ae"));
+                DrawString(font, new Vector2(vp.X * 0.5f - 48f, 42f),
+                    $"60Hz TICK\n  {_matchState!.Tick:D5}",
+                    HorizontalAlignment.Center, -1, 15, new Color("cfc0ae"));
+            }
+            else
+            {
+                DrawString(font, new Vector2(marginX, 84f),
+                    "FIRST FIGHTER",
+                    HorizontalAlignment.Left, -1, 15, new Color("efe6dc"));
 
-            // Live Combo & Holy Trinity Scaling Banner
+                DrawString(font, new Vector2(p2Left, 84f),
+                    "MIRROR DUMMY",
+                    HorizontalAlignment.Left, -1, 15, new Color("efe6dc"));
+            }
+
             FighterState? comboVictim = p2.ComboHits > 0 ? p2 : (p1.ComboHits > 0 ? p1 : null);
             if (comboVictim != null && comboVictim.ComboHits >= 1)
             {
                 string who = comboVictim.PlayerIndex == 1 ? "P1 COMBO" : "P2 COMBO";
                 float bannerX = comboVictim.PlayerIndex == 1 ? marginX : p2Left;
-                Rect2 comboBox = new Rect2(bannerX, 118f, 340f, 62f);
-                DrawRect(comboBox, new Color(0.14f, 0.12f, 0.10f, 0.86f));
+                float comboTop = _trainingOverlay ? 118f : 96f;
+                Rect2 comboBox = new Rect2(bannerX, comboTop, 340f, _trainingOverlay ? 62f : 40f);
+                DrawRect(comboBox, new Color(0.10f, 0.11f, 0.14f, 0.82f));
                 DrawRect(comboBox, new Color("e6b84c"), filled: false, width: 2f);
 
-                DrawString(font, new Vector2(bannerX + 14f, 144f),
+                DrawString(font, new Vector2(bannerX + 14f, comboTop + 26f),
                     $"{who}: {comboVictim.ComboHits} HITS  ({comboVictim.ComboDamage} DMG)",
                     HorizontalAlignment.Left, -1, 18, new Color("ffd166"));
 
-                int pushScale = 100 + Math.Min(Math.Max(0, comboVictim.ComboHits - 1), 8) * 15;
-                string gbText = comboVictim.UsedGroundBounce ? " [GROUND BOUNCE USED]" : "";
-                DrawString(font, new Vector2(bannerX + 14f, 168f),
-                    $"DMG SCALE: {comboVictim.LastScalingPercent}%   PUSHBACK: {pushScale}%{gbText}",
-                    HorizontalAlignment.Left, -1, 13, new Color("cfc0ae"));
+                if (_trainingOverlay)
+                {
+                    int pushScale = 100 + Math.Min(Math.Max(0, comboVictim.ComboHits - 1), 8) * 15;
+                    string gbText = comboVictim.UsedGroundBounce ? " [GROUND BOUNCE USED]" : "";
+                    DrawString(font, new Vector2(bannerX + 14f, comboTop + 50f),
+                        $"DMG SCALE: {comboVictim.LastScalingPercent}%   PUSHBACK: {pushScale}%{gbText}",
+                        HorizontalAlignment.Left, -1, 13, new Color("cfc0ae"));
+                }
             }
         }
 
@@ -164,36 +180,34 @@ namespace FirstFighter.Game
         {
             float panelHeight = 148f;
             float panelTop = vp.Y - panelHeight;
-            DrawRect(new Rect2(0, panelTop, vp.X, panelHeight), new Color(0.10f, 0.09f, 0.08f, 0.86f));
+            DrawRect(new Rect2(0, panelTop, vp.X, panelHeight), new Color(0.08f, 0.09f, 0.11f, 0.86f));
 
             float leftX = 44f;
             float cellW = 14f;
             float cellH = 20f;
             float gap = 2f;
 
-            // Legend & Hotkeys Bar
             string statusLine =
                 $"[F1] 3D Boxes: {(_showDebugBoxes ? "ON" : "OFF")}   " +
-                $"[F2] Pause/Step: {(_paused ? "PAUSED (Press F2 to Step +1f, Space to Resume)" : "LIVE 60Hz")}   " +
+                $"[F2] Pause/Step: {(_paused ? "PAUSED (F2 Step +1f, Space Resume)" : "LIVE 60Hz")}   " +
                 $"[F3] Dummy: {_dummyMode}   " +
                 $"[F4] 11-Hit Combo   " +
+                $"[F6] Training: ON   " +
                 $"[F8] Model: {_meshMode}   " +
-                $"[F9] Turnaround & 12-Move Studio Inspector";
+                $"[F9] Turnaround Inspector";
 
             DrawString(font, new Vector2(leftX, panelTop + 22f),
                 statusLine, HorizontalAlignment.Left, -1, 13, new Color("e6b84c"));
 
-            // Draw 60-tick Frame Timeline for P1 and P2
             DrawFighterFrameRow(font, "P1", p1, leftX, panelTop + 38f, cellW, cellH, gap);
             DrawFighterFrameRow(font, "P2", p2, leftX, panelTop + 68f, cellW, cellH, gap);
 
-            // Color Legend + Controls Reference
             DrawString(font, new Vector2(leftX, panelTop + 114f),
                 "FRAME METER LEGEND:  [CYAN = Startup]   [RED = Active]   [BLUE = Recovery]   [YELLOW = Hit/Blockstun]   [GOLD = Parry/Invuln]",
                 HorizontalAlignment.Left, -1, 13, new Color("cfc0ae"));
 
             DrawString(font, new Vector2(leftX, panelTop + 134f),
-                "CONTROLS:  WASD / Arrows = Move/Crouch/Jump   J = L (Jab)   K = M (Kick/Sweep)   L = H (Cross/6H Overhead)   U = S (5S Launch / j.S Meteor / 4S Parry)   I = L+M Throw   O = 236H+S Super",
+                "CONTROLS:  WASD / Arrows = Move/Crouch/Jump   J = L   K = M   L = H   U = S   I = Throw   O = Super",
                 HorizontalAlignment.Left, -1, 12, new Color("b6a89a"));
         }
 
@@ -252,12 +266,12 @@ namespace FirstFighter.Game
         {
             return kind switch
             {
-                FrameTimelineCellKind.Startup => new Color("2ec4b6"),       // Cyan
-                FrameTimelineCellKind.Active => new Color("e71d36"),        // Red
-                FrameTimelineCellKind.Recovery => new Color("3a86ff"),      // Blue
-                FrameTimelineCellKind.Hitstun => new Color("ffbe0b"),       // Yellow
-                FrameTimelineCellKind.Blockstun => new Color("fb8500"),     // Amber-Yellow
-                FrameTimelineCellKind.ParryOrInvuln => new Color("ffd700"), // Gold
+                FrameTimelineCellKind.Startup => new Color("2ec4b6"),
+                FrameTimelineCellKind.Active => new Color("e71d36"),
+                FrameTimelineCellKind.Recovery => new Color("3a86ff"),
+                FrameTimelineCellKind.Hitstun => new Color("ffbe0b"),
+                FrameTimelineCellKind.Blockstun => new Color("fb8500"),
+                FrameTimelineCellKind.ParryOrInvuln => new Color("ffd700"),
                 FrameTimelineCellKind.Movement => new Color("5c554f"),
                 _ => new Color("2b2724")
             };
@@ -265,7 +279,6 @@ namespace FirstFighter.Game
 
         private void DrawTurnaroundAndMoveInspectorOverlay(Vector2 vp, Font font)
         {
-            // Top Studio Title matching reference_first_fighter.jpg
             DrawRect(new Rect2(0, 0, vp.X, 74f), new Color(0.12f, 0.11f, 0.10f, 0.82f));
             DrawString(font, new Vector2(40f, 30f),
                 "F I R S T   F I G H T E R   —   4-PANEL TURNAROUND SHEET & 12-MOVE KEY-POSE STUDIO (F9 TO RETURN TO MATCH)",
@@ -280,7 +293,6 @@ namespace FirstFighter.Game
                 $"SCRUB TICK [Left/Right Arrows]: {_inspectorTick} / {move.TotalTicks}   (Startup:{move.Startup}  Active:{move.Active}  Recovery:{move.Recovery})   |   [F1] 3D Boxes: {(_showDebugBoxes ? "ON" : "OFF")}",
                 HorizontalAlignment.Left, -1, 14, new Color("ffd166"));
 
-            // Labels underneath the 4 Turnaround Figures + 5th Live Move Scrub Figure
             float labelY = vp.Y - 115f;
             DrawString(font, new Vector2(vp.X * 0.14f, labelY), "F R O N T", HorizontalAlignment.Center, -1, 16, new Color("2b2623"));
             DrawString(font, new Vector2(vp.X * 0.31f, labelY), "S I D E", HorizontalAlignment.Center, -1, 16, new Color("2b2623"));
@@ -288,7 +300,6 @@ namespace FirstFighter.Game
             DrawString(font, new Vector2(vp.X * 0.66f, labelY), "G U A R D", HorizontalAlignment.Center, -1, 16, new Color("2b2623"));
             DrawString(font, new Vector2(vp.X * 0.85f, labelY), $"M O V E : {move.Code} (t={_inspectorTick})", HorizontalAlignment.Center, -1, 16, new Color("2b2623"));
 
-            // Bottom Frame Bar for the selected move
             DrawRect(new Rect2(0, vp.Y - 86f, vp.X, 86f), new Color(0.11f, 0.10f, 0.09f, 0.88f));
             DrawString(font, new Vector2(40f, vp.Y - 58f),
                 $"KEY-POSE SILHOUETTE: {move.KeyPoseSummary}",

@@ -7,8 +7,8 @@ namespace FirstFighter.Game
 {
     /// <summary>
     /// Root scene controller coordinating the 60 Hz deterministic MatchSim,
-    /// P1 & P2 FighterVisualNodes, Sloclap StudioArenaNode, F9 Turnaround & Move Inspector,
-    /// and live Golden 11-Hit Showcase Combo playback (F4).
+    /// P1 & P2 FighterVisualNodes, Cheonggyecheon night arena (studio cyclorama on F9),
+    /// clean match HUD with F6 training overlay, and Golden 11-Hit Showcase (F4).
     /// </summary>
     public partial class MainController : Node3D
     {
@@ -23,7 +23,8 @@ namespace FirstFighter.Game
         private readonly FighterVisualNode[] _turnaroundMannequins = new FighterVisualNode[3];
         private FighterState _inspectorPreviewState = new FighterState();
 
-        private bool _showDebugBoxes = true;
+        private bool _showDebugBoxes;
+        private bool _trainingOverlay;
         private bool _paused;
         private bool _stepSingleTickRequested;
         private DummyBehaviorMode _dummyMode = DummyBehaviorMode.Stand;
@@ -36,7 +37,7 @@ namespace FirstFighter.Game
         private readonly Queue<FighterButtons> _goldenComboScriptQueue = new Queue<FighterButtons>();
 
         // Key edge tracking
-        private bool _prevF1, _prevF2, _prevF3, _prevF4, _prevF8, _prevF9, _prevSpace, _prevR;
+        private bool _prevF1, _prevF2, _prevF3, _prevF4, _prevF6, _prevF8, _prevF9, _prevSpace, _prevR;
         private bool _prevLeft, _prevRight, _prevUp, _prevDown;
         private FighterMeshMode _globalMeshMode = FighterMeshMode.MeshyGlbWithGuardStatue;
 
@@ -73,6 +74,18 @@ namespace FirstFighter.Game
 
             SimState.Reset();
             SimState.Fighters[0].Meter = 100; // Start with full Super meter so 236H+S can be tested immediately
+
+            // Movie Maker evidence captures: play the golden combo after a short settle so
+            // still/motion frames show the night stage under a real match sequence.
+            if (!string.IsNullOrEmpty(Engine.GetWriteMoviePath()))
+            {
+                for (int i = 0; i < 45; i++)
+                {
+                    _goldenComboScriptQueue.Enqueue(FighterButtons.None);
+                }
+                EnqueueGoldenComboShowcase();
+            }
+
             SyncPresentation(1f / 60f);
         }
 
@@ -133,7 +146,8 @@ namespace FirstFighter.Game
                 _turnaroundInspectorActive,
                 _inspectorMoveIndex,
                 _inspectorTick,
-                _globalMeshMode);
+                _globalMeshMode,
+                _trainingOverlay);
         }
 
         private void UpdateTurnaroundInspectorScene(float deltaSec)
@@ -211,7 +225,8 @@ namespace FirstFighter.Game
                 _turnaroundInspectorActive,
                 _inspectorMoveIndex,
                 _inspectorTick,
-                _globalMeshMode);
+                _globalMeshMode,
+                _trainingOverlay);
         }
 
         private void HandleStudioHotkeys()
@@ -220,6 +235,7 @@ namespace FirstFighter.Game
             bool f2 = Input.IsPhysicalKeyPressed(Key.F2);
             bool f3 = Input.IsPhysicalKeyPressed(Key.F3);
             bool f4 = Input.IsPhysicalKeyPressed(Key.F4);
+            bool f6 = Input.IsPhysicalKeyPressed(Key.F6);
             bool f8 = Input.IsPhysicalKeyPressed(Key.F8);
             bool f9 = Input.IsPhysicalKeyPressed(Key.F9);
             bool space = Input.IsPhysicalKeyPressed(Key.Space);
@@ -248,6 +264,10 @@ namespace FirstFighter.Game
             if (f4 && !_prevF4)
             {
                 EnqueueGoldenComboShowcase();
+            }
+            if (f6 && !_prevF6)
+            {
+                _trainingOverlay = !_trainingOverlay;
             }
             if (f8 && !_prevF8)
             {
@@ -304,6 +324,7 @@ namespace FirstFighter.Game
             _prevF2 = f2;
             _prevF3 = f3;
             _prevF4 = f4;
+            _prevF6 = f6;
             _prevF8 = f8;
             _prevF9 = f9;
             _prevSpace = space;
