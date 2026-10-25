@@ -1,0 +1,17 @@
+# Godot 4+ cache & build outputs
+.godot/*
+!.godot/packages/
+!.godot/packages/**
+
+# .NET build artifacts
+**/[Bb]in/
+**/[Bb]in/**
+**/[Oo]bj/
+**/[Oo]bj/**
+**/.local/
+**/.local/**
+.nuget/
+
+# OS metadata
+.DS_Store
+Thumbs.db

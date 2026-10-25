@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FirstFighter.Game</RootNamespace>
+    <AssemblyName>FirstFighter</AssemblyName>
+    <GodotProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/..'))</GodotProjectDir>
+    <GodotProjectDirBase64>$([MSBuild]::ConvertToBase64('$(GodotProjectDir)/'))</GodotProjectDirBase64>
+    <DefineConstants>$(DefineConstants);GODOT;GODOT_OSX;GODOT_MACOS;GODOT_PC;TOOLS</DefineConstants>
+    <BaseOutputPath>$(GodotProjectDir)/.godot/mono/temp/bin/</BaseOutputPath>
+    <OutputPath>$(GodotProjectDir)/.godot/mono/temp/bin/$(Configuration)/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildProjectDirectory)/../.godot/packages/godot.sourcegenerators/4.7.2/build/Godot.SourceGenerators.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\sim\FirstFighter.Sim.csproj" />
+    <Reference Include="GodotSharp">
+      <HintPath>$(MSBuildProjectDirectory)/../.godot/packages/godotsharp/4.7.2/lib/net8.0/GodotSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="GodotSharpEditor" Condition=" '$(Configuration)' == 'Debug' ">
+      <HintPath>$(MSBuildProjectDirectory)/../.godot/packages/godotsharpeditor/4.7.2/lib/net8.0/GodotSharpEditor.dll</HintPath>
+    </Reference>
+    <Analyzer Include="$(MSBuildProjectDirectory)/../.godot/packages/godot.sourcegenerators/4.7.2/analyzers/dotnet/cs/Godot.SourceGenerators.dll" />
+  </ItemGroup>
+
+  <Target Name="VSTest" />
+</Project>

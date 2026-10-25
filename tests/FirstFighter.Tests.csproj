@@ -1,0 +1,32 @@
+<Project>
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FirstFighter.Tests</RootNamespace>
+    <AssemblyName>FirstFighter.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\sim\FirstFighter.Sim.csproj" />
+    <Compile Include="..\game\FirstFighterModelBuilder.cs" Link="FirstFighterModelBuilder.cs" />
+    <Compile Include="..\game\FighterPoseEngine.cs" Link="FighterPoseEngine.cs" />
+    <Reference Include="GodotSharp">
+      <HintPath>$(MSBuildProjectDirectory)/../.godot/packages/godotsharp/4.7.2/lib/net8.0/GodotSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
+
+  <Target Name="VSTest" DependsOnTargets="Build">
+    <PropertyGroup>
+      <_DotNetHost Condition="'$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</_DotNetHost>
+      <_DotNetHost Condition="'$(_DotNetHost)' == ''">dotnet</_DotNetHost>
+    </PropertyGroup>
+    <Exec Command="&quot;$(_DotNetHost)&quot; exec &quot;$(TargetPath)&quot;" />
+  </Target>
+</Project>
