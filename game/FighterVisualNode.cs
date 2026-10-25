@@ -31,7 +31,7 @@ namespace FirstFighter.Game
         private int _prevStructure;
         private int _prevMeter;
 
-        public FighterMeshMode CurrentMeshMode { get; set; } = FighterMeshMode.MeshyGlbWithGuardStatue;
+        public FighterMeshMode CurrentMeshMode { get; set; } = FighterMeshMode.ProceduralRig;
 
         public void Initialize(bool isPlayerTwoPalette)
         {

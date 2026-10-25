@@ -12,9 +12,10 @@ namespace FirstFighter.Game
     {
         public static readonly Color StudioBackdropColor = new Color("867970");
         public static readonly Color StudioFloorColor = new Color("8e8178");
-        public static readonly Color NightAmbientColor = new Color("2a3348");
-        public static readonly Color NightFillColor = new Color("a8b8d0");
-        public static readonly Color NightRimColor = new Color("c8d4e4");
+        public static readonly Color NightAmbientColor = new Color("243048");
+        public static readonly Color NightKeyColor = new Color("ffe8cc");
+        public static readonly Color NightFillColor = new Color("7a9ab8");
+        public static readonly Color NightRimColor = new Color("5ac8d4");
         public static readonly Color StudioAmbientColor = new Color("9c9088");
         public static readonly Color StudioFillColor = new Color("d8cfc8");
         public static readonly Color StudioRimColor = new Color("efe6dc");
@@ -38,6 +39,9 @@ namespace FirstFighter.Game
         private SeoulNightStage _seoulStage = null!;
         private bool _inspectorMode;
 
+        /// <summary>0..1 bias applied during K.O. finish for a slight dramatic zoom.</summary>
+        public float KoCameraZoom { get; set; }
+
         public override void _Ready()
         {
             BuildEnvironmentAndLighting();
@@ -55,9 +59,19 @@ namespace FirstFighter.Game
                 BackgroundColor = SeoulNightStage.SkyZenith,
                 AmbientLightSource = Godot.Environment.AmbientSource.Color,
                 AmbientLightColor = NightAmbientColor,
-                AmbientLightEnergy = 0.58f,
+                AmbientLightEnergy = 0.52f,
                 TonemapMode = Godot.Environment.ToneMapper.Linear,
-                TonemapExposure = 1.0f
+                TonemapExposure = 1.0f,
+                GlowEnabled = true,
+                GlowIntensity = 0.55f,
+                GlowStrength = 0.85f,
+                GlowBloom = 0.18f,
+                GlowHdrThreshold = 0.72f,
+                FogEnabled = true,
+                FogLightColor = new Color("1a2438"),
+                FogDensity = 0.0085f,
+                FogAerialPerspective = 0.35f,
+                FogSkyAffect = 0.15f
             };
             _worldEnv = new WorldEnvironment
             {
@@ -66,35 +80,37 @@ namespace FirstFighter.Game
             };
             AddChild(_worldEnv);
 
-            // Warm key preserved so the oatmeal henley and skin still separate from cool night fill.
+            // Warm streetlamp key so oatmeal henley / skin stay readable against cool night fill.
             _keyLight = new DirectionalLight3D
             {
                 Name = "KeyLight3D",
-                LightColor = new Color("fff7ed"),
-                LightEnergy = 0.98f,
+                LightColor = NightKeyColor,
+                LightEnergy = 1.05f,
                 ShadowEnabled = true,
-                ShadowOpacity = 0.38f,
-                RotationDegrees = new Vector3(-46f, -32f, 0f)
+                ShadowOpacity = 0.36f,
+                RotationDegrees = new Vector3(-44f, -28f, 0f)
             };
             AddChild(_keyLight);
 
+            // Cool Cheonggyecheon water-bounce fill
             _fillLight = new DirectionalLight3D
             {
                 Name = "FillLight3D",
                 LightColor = NightFillColor,
-                LightEnergy = 0.38f,
+                LightEnergy = 0.42f,
                 ShadowEnabled = false,
-                RotationDegrees = new Vector3(-28f, 142f, 0f)
+                RotationDegrees = new Vector3(-22f, 148f, 0f)
             };
             AddChild(_fillLight);
 
+            // Crisp cyan/amber city rim so faceted limbs catch neon
             _rimLight = new DirectionalLight3D
             {
                 Name = "RimLight3D",
                 LightColor = NightRimColor,
-                LightEnergy = 0.30f,
+                LightEnergy = 0.42f,
                 ShadowEnabled = false,
-                RotationDegrees = new Vector3(-62f, 180f, 0f)
+                RotationDegrees = new Vector3(-55f, 175f, 0f)
             };
             AddChild(_rimLight);
         }
@@ -168,14 +184,18 @@ namespace FirstFighter.Game
             _inspectorMode = false;
             _studioRoot.Visible = false;
             _seoulStage.Visible = true;
-            _worldEnv.Environment.BackgroundColor = SeoulNightStage.SkyZenith;
-            _worldEnv.Environment.AmbientLightColor = NightAmbientColor;
-            _worldEnv.Environment.AmbientLightEnergy = 0.58f;
-            _keyLight.LightEnergy = 0.98f;
+            var env = _worldEnv.Environment;
+            env.BackgroundColor = SeoulNightStage.SkyZenith;
+            env.AmbientLightColor = NightAmbientColor;
+            env.AmbientLightEnergy = 0.52f;
+            env.GlowEnabled = true;
+            env.FogEnabled = true;
+            _keyLight.LightColor = NightKeyColor;
+            _keyLight.LightEnergy = 1.05f;
             _fillLight.LightColor = NightFillColor;
-            _fillLight.LightEnergy = 0.38f;
+            _fillLight.LightEnergy = 0.42f;
             _rimLight.LightColor = NightRimColor;
-            _rimLight.LightEnergy = 0.30f;
+            _rimLight.LightEnergy = 0.42f;
             _seoulStage.SetSuperCinema(false);
         }
 
@@ -184,9 +204,13 @@ namespace FirstFighter.Game
             _inspectorMode = true;
             _studioRoot.Visible = true;
             _seoulStage.Visible = false;
-            _worldEnv.Environment.BackgroundColor = StudioBackdropColor;
-            _worldEnv.Environment.AmbientLightColor = StudioAmbientColor;
-            _worldEnv.Environment.AmbientLightEnergy = 0.58f;
+            var env = _worldEnv.Environment;
+            env.BackgroundColor = StudioBackdropColor;
+            env.AmbientLightColor = StudioAmbientColor;
+            env.AmbientLightEnergy = 0.58f;
+            env.GlowEnabled = false;
+            env.FogEnabled = false;
+            _keyLight.LightColor = new Color("fff7ed");
             _keyLight.LightEnergy = 0.92f;
             _fillLight.LightColor = StudioFillColor;
             _fillLight.LightEnergy = 0.36f;
@@ -241,9 +265,13 @@ namespace FirstFighter.Game
             }
             else
             {
-                _keyLight.LightEnergy = 0.98f;
+                _keyLight.LightEnergy = 1.05f;
                 _worldEnv.Environment.BackgroundColor = SeoulNightStage.SkyZenith;
                 _seoulStage.SetSuperCinema(false);
+                if (KoCameraZoom > 0.01f)
+                {
+                    targetZ = Mathf.Lerp(targetZ, 2.70f, Mathf.Clamp(KoCameraZoom, 0f, 1f));
+                }
             }
 
             Vector3 desiredCam = new Vector3(midX, targetY, targetZ);

@@ -98,11 +98,17 @@ namespace FirstFighter.Game
         /// <summary>Vertical night sky gradient for the far unshaded cyclorama (v=0 top, v=1 horizon).</summary>
         public static ImageTexture NightSkyAlbedo() => Cached("night_sky_albedo", BuildNightSkyAlbedo);
 
-        /// <summary>Still canal water: soft lengthwise streak, cool tonal drift.</summary>
+        /// <summary>Still canal water: soft lengthwise streak, cool tonal drift, light reflection bands.</summary>
         public static ImageTexture NightWaterAlbedo() => Cached("night_water_albedo", BuildNightWaterAlbedo);
+
+        /// <summary>Ripple normal map for the Cheonggyecheon canal surface.</summary>
+        public static ImageTexture NightWaterNormal() => Cached("night_water_normal", BuildNightWaterNormal);
 
         /// <summary>Cool grey cut stone for embankment / coping faces.</summary>
         public static ImageTexture NightStoneAlbedo() => Cached("night_stone_albedo", BuildNightStoneAlbedo);
+
+        /// <summary>Facade plaster / concrete for mid-rise Seoul buildings.</summary>
+        public static ImageTexture NightFacadeAlbedo() => Cached("night_facade_albedo", BuildNightFacadeAlbedo);
 
         // ------------------------------------------------------------------
         // Character
@@ -359,14 +365,34 @@ namespace FirstFighter.Game
             float[] broad = Fbm(w, h, 7203, 0.018f, 3, 0.50f);
             var values = new float[w * h];
 
-            for (int i = 0; i < values.Length; i++)
+            for (int y = 0; y < h; y++)
             {
-                values[i] = 1f
-                            + (length[i] - 0.5f) * 0.12f
-                            + (broad[i] - 0.5f) * 0.06f;
+                float v = y / (float)(h - 1);
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x;
+                    float streak = 1f
+                                   + (length[i] - 0.5f) * 0.14f
+                                   + (broad[i] - 0.5f) * 0.06f;
+
+                    // Soft vertical reflection bands under embankment LEDs / neon.
+                    float band = Mathf.Sin((x / (float)w) * Mathf.Tau * 5.5f + v * 1.2f);
+                    float glow = Mathf.Clamp(band * 0.55f + 0.45f, 0f, 1f);
+                    streak += glow * 0.12f * (0.55f + 0.45f * (1f - v));
+
+                    values[i] = streak;
+                }
             }
 
             return WriteDetailField(values, w, h, NightWaterMean);
+        }
+
+        private static Image BuildNightWaterNormal()
+        {
+            const int w = 512;
+            const int h = 256;
+            float[] ripples = FbmAnisotropic(w, h, 7301, 0.085f, 3, stretchY: 4.5f);
+            return HeightToNormal(w, h, ripples, strength: 2.8f, wrap: true);
         }
 
         private static Image BuildNightStoneAlbedo()
@@ -381,6 +407,23 @@ namespace FirstFighter.Game
                 values[i] = 1f
                             + (broad[i] - 0.5f) * 0.10f
                             + (fine[i] - 0.5f) * 0.04f;
+            }
+
+            return WriteDetailField(values, size, size, NightStoneMean);
+        }
+
+        private static Image BuildNightFacadeAlbedo()
+        {
+            const int size = 512;
+            float[] broad = Fbm(size, size, 9103, 0.016f, 3, 0.50f);
+            float[] fine = Fbm(size, size, 9209, 0.22f, 2, 0.45f);
+            var values = new float[size * size];
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                values[i] = 1f
+                            + (broad[i] - 0.5f) * 0.08f
+                            + (fine[i] - 0.5f) * 0.035f;
             }
 
             return WriteDetailField(values, size, size, NightStoneMean);

@@ -34,10 +34,42 @@ namespace FirstFighter.Game
         private ArrayMesh? _backMesh;
         private ArrayMesh? _guardMesh;
 
-        public ArrayMesh FrontPanelMesh => _frontMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Front);
-        public ArrayMesh SidePanelMesh => _sideMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Side);
-        public ArrayMesh BackPanelMesh => _backMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Back);
-        public ArrayMesh GuardPanelMesh => _guardMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Guard);
+        public ArrayMesh FrontPanelMesh => _frontMesh ??= MeshyGlbLoader.BuildPaletteArrayMesh(
+            Raw.Front,
+            FirstFighterModelBuilder.P1HenleyBase,
+            FirstFighterModelBuilder.P1SlacksBase,
+            FirstFighterModelBuilder.SkinBase,
+            FirstFighterModelBuilder.HairBase,
+            FirstFighterModelBuilder.BrowColor,
+            FirstFighterModelBuilder.LoaferUpperColor,
+            FirstFighterModelBuilder.LoaferSoleColor);
+        public ArrayMesh SidePanelMesh => _sideMesh ??= MeshyGlbLoader.BuildPaletteArrayMesh(
+            Raw.Side,
+            FirstFighterModelBuilder.P1HenleyBase,
+            FirstFighterModelBuilder.P1SlacksBase,
+            FirstFighterModelBuilder.SkinBase,
+            FirstFighterModelBuilder.HairBase,
+            FirstFighterModelBuilder.BrowColor,
+            FirstFighterModelBuilder.LoaferUpperColor,
+            FirstFighterModelBuilder.LoaferSoleColor);
+        public ArrayMesh BackPanelMesh => _backMesh ??= MeshyGlbLoader.BuildPaletteArrayMesh(
+            Raw.Back,
+            FirstFighterModelBuilder.P1HenleyBase,
+            FirstFighterModelBuilder.P1SlacksBase,
+            FirstFighterModelBuilder.SkinBase,
+            FirstFighterModelBuilder.HairBase,
+            FirstFighterModelBuilder.BrowColor,
+            FirstFighterModelBuilder.LoaferUpperColor,
+            FirstFighterModelBuilder.LoaferSoleColor);
+        public ArrayMesh GuardPanelMesh => _guardMesh ??= MeshyGlbLoader.BuildPaletteArrayMesh(
+            Raw.Guard,
+            FirstFighterModelBuilder.P1HenleyBase,
+            FirstFighterModelBuilder.P1SlacksBase,
+            FirstFighterModelBuilder.SkinBase,
+            FirstFighterModelBuilder.HairBase,
+            FirstFighterModelBuilder.BrowColor,
+            FirstFighterModelBuilder.LoaferUpperColor,
+            FirstFighterModelBuilder.LoaferSoleColor);
 
         // Raw vertex/index arrays for Panel 1 (FRONT) in normalized 1.85m space
         public Vector3[] FrontVertices => Raw.Front.Vertices;
@@ -251,7 +283,19 @@ namespace FirstFighter.Game
             };
         }
 
-        public static ArrayMesh BuildArrayMesh(MeshyRawPanel panel)
+        /// <summary>
+        /// Build a flat-shaded Meshy panel mesh with P1/P2 palette facet colours and box-projected UVs
+        /// so cloth / skin / hair / loafer detail maps can land on the statue and partitioned rig.
+        /// </summary>
+        public static ArrayMesh BuildPaletteArrayMesh(
+            MeshyRawPanel panel,
+            Color shirtColor,
+            Color slacksColor,
+            Color skinColor,
+            Color hairColor,
+            Color browColor,
+            Color loaferColor,
+            Color soleColor)
         {
             var verts = panel.Vertices;
             var indices = panel.Indices;
@@ -259,7 +303,6 @@ namespace FirstFighter.Game
 
             var st = new SurfaceTool();
             st.Begin(Mesh.PrimitiveType.Triangles);
-            Color baseCol = new Color("bdac9a");
 
             for (int t = 0; t < indices.Length / 3; t++)
             {
@@ -270,21 +313,55 @@ namespace FirstFighter.Game
                 Vector3 normal = (v1 - v0).Cross(v2 - v0).Normalized();
                 if (normal.LengthSquared() < 0.0001f) normal = Vector3.Up;
 
-                st.SetNormal(normal);
-                st.SetColor(baseCol);
-                st.AddVertex(v0);
+                Vector3 center = (v0 + v1 + v2) / 3f;
+                FighterBone bone = ClassifyCentroidToBone(center);
+                Color color = DetermineFacetColor(
+                    center, bone, shirtColor, slacksColor, skinColor, hairColor, browColor, loaferColor, soleColor);
+                float facetShift = ((t & 1) == 0) ? 0.025f : -0.022f;
+                Color facetColor = facetShift >= 0 ? color.Lightened(facetShift) : color.Darkened(-facetShift);
 
-                st.SetNormal(normal);
-                st.SetColor(baseCol);
-                st.AddVertex(v1);
-
-                st.SetNormal(normal);
-                st.SetColor(baseCol);
-                st.AddVertex(v2);
+                EmitShadedVertex(st, v0, normal, facetColor);
+                EmitShadedVertex(st, v1, normal, facetColor);
+                EmitShadedVertex(st, v2, normal, facetColor);
             }
 
-            st.SetMaterial(FirstFighterModelBuilder.CreateFlatFacetMaterial(Colors.White, 0.85f, useVertexColors: true));
+            st.SetMaterial(FirstFighterModelBuilder.CreateFlatFacetMaterial(
+                Colors.White, 0.85f, useVertexColors: true, kind: SurfaceKind.Fabric));
+            st.GenerateTangents();
             return st.Commit();
+        }
+
+        private static void EmitShadedVertex(SurfaceTool st, Vector3 p, Vector3 normal, Color color)
+        {
+            st.SetNormal(normal);
+            st.SetColor(color);
+            st.SetUV(BoxProjectUv(p, normal));
+            st.AddVertex(p);
+        }
+
+        private static Vector2 BoxProjectUv(Vector3 p, Vector3 normal)
+        {
+            float nx = Mathf.Abs(normal.X);
+            float ny = Mathf.Abs(normal.Y);
+            float nz = Mathf.Abs(normal.Z);
+
+            if (ny >= nx && ny >= nz) return new Vector2(p.X, p.Z);
+            if (nx >= nz) return new Vector2(p.Z, p.Y);
+            return new Vector2(p.X, p.Y);
+        }
+
+        private static SurfaceKind SurfaceKindForBone(FighterBone bone)
+        {
+            return bone switch
+            {
+                FighterBone.Head => SurfaceKind.Hair,
+                FighterBone.Neck => SurfaceKind.Skin,
+                FighterBone.LowerArmL or FighterBone.LowerArmR or FighterBone.FistL or FighterBone.FistR => SurfaceKind.Skin,
+                FighterBone.FootL or FighterBone.FootR => SurfaceKind.Leather,
+                FighterBone.Hips or FighterBone.UpperLegL or FighterBone.UpperLegR or FighterBone.LowerLegL or FighterBone.LowerLegR
+                    => SurfaceKind.Trouser,
+                _ => SurfaceKind.Fabric
+            };
         }
 
         private static int GetOrCreateVert(int originalIdx, Vector3[] allVerts, Dictionary<int, int> vertMap, List<Vector3> newVertsList)
@@ -342,38 +419,38 @@ namespace FirstFighter.Game
 
                 FighterBone bone = ClassifyCentroidToBone(center);
                 Color color = DetermineFacetColor(center, bone, shirtColor, slacksColor, skinColor, hairColor, browColor, loaferColor, soleColor);
-
-                // Subtly modulate facet color for flat-shaded visual pop
                 float facetShift = ((t & 1) == 0) ? 0.025f : -0.022f;
                 Color facetColor = facetShift >= 0 ? color.Lightened(facetShift) : color.Darkened(-facetShift);
 
-                // Transform triangle vertices to the bone's local rest coordinate space
                 Vector3 bWorld = boneWorldPositions[(int)bone];
-                Vector3 lv0 = v0 - bWorld;
-                Vector3 lv1 = v1 - bWorld;
-                Vector3 lv2 = v2 - bWorld;
-
                 var st = boneTools[(int)bone];
+
+                // Local verts for bone attachment; world verts for box-projected UVs.
                 st.SetNormal(normal);
                 st.SetColor(facetColor);
-                st.AddVertex(lv0);
+                st.SetUV(BoxProjectUv(v0, normal));
+                st.AddVertex(v0 - bWorld);
 
                 st.SetNormal(normal);
                 st.SetColor(facetColor);
-                st.AddVertex(lv1);
+                st.SetUV(BoxProjectUv(v1, normal));
+                st.AddVertex(v1 - bWorld);
 
                 st.SetNormal(normal);
                 st.SetColor(facetColor);
-                st.AddVertex(lv2);
+                st.SetUV(BoxProjectUv(v2, normal));
+                st.AddVertex(v2 - bWorld);
             }
 
             // Commit meshes to bone attachment nodes
             for (int b = 0; b < FirstFighterModelBuilder.BoneCount; b++)
             {
+                boneTools[b].GenerateTangents();
                 var mesh = boneTools[b].Commit();
                 if (mesh.GetSurfaceCount() > 0)
                 {
-                    mesh.SurfaceSetMaterial(0, FirstFighterModelBuilder.CreateFlatFacetMaterial(Colors.White, 0.85f, useVertexColors: true));
+                    mesh.SurfaceSetMaterial(0, FirstFighterModelBuilder.CreateFlatFacetMaterial(
+                        Colors.White, 0.85f, useVertexColors: true, kind: SurfaceKindForBone((FighterBone)b)));
                     var inst = new MeshInstance3D
                     {
                         Name = $"Meshy_{((FighterBone)b)}",

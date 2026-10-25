@@ -20,8 +20,8 @@ Inspired by Sloclap's *Sifu*, Andrea "Jens" Demetrio's *I wanna make a fighting 
 - **`game/` (Presentation Layer)**:
   - `FirstFighterModelBuilder.cs`: Procedural flat-shaded faceted 3D mesh with unindexed per-triangle normals on a 19-bone `Skeleton3D` (1.85m tall, 7.8 heads) matching `reference_first_fighter.png`.
   - `FighterPoseEngine.cs`: Non-linear keyframe snapping (`Windup -> Active -> Recovery`), 1.22x axial striking limb stretch, smear arcs, and branched Block/Whiff recovery.
-  - `SeoulNightStage.cs` / `StudioArenaNode.cs`: Cheonggyecheon night match arena (wet granite, canal band, skyline, geometric neon) with warm key + cool night fill; F9 turnaround keeps the taupe studio cyclorama.
-  - `HudAndFrameStudio.cs`: Clean match HUD (health / structure / meter + names). `F6` training overlay adds the 60-tick Frame Meter, hotkey legend, and live Frame Advantage.
+  - `SeoulNightStage.cs` / `StudioArenaNode.cs`: Cheonggyecheon night arena — stepped promenade, reflective canal, multi-bay facades, framed neon, bloom/fog; warm streetlamp key + cyan rim. F9 keeps the taupe studio cyclorama.
+  - `HudAndFrameStudio.cs`: Match HUD with damage-trail health bars, segmented meter, round timer/pips, Round/FIGHT/K.O. callouts. `F6` training overlay adds the frame meter. Default fighter mesh is the multi-material `ProceduralRig`.
 - **`tests/` (Verification Suite)**:
   - 8 headless deterministic verification tests verifying netcode determinism, high whiff on crouch, guard matrix, priority parser, anti-infinite pushback scaling, 11-hit golden combo, sim purity, and model bone anatomy.
 
