@@ -75,40 +75,35 @@ namespace FirstFighter.Game
 
         public Node3D? ProceduralRootNode { get; set; }
         public Node3D? MeshyRigRootNode { get; set; }
+        public Node3D[] ProcGeomNodes { get; init; } = Array.Empty<Node3D>();
+        public Node3D[] MeshyGeomNodes { get; init; } = Array.Empty<Node3D>();
         public MeshInstance3D? MeshyGuardStatueInstance { get; set; }
 
         public void SetMeshMode(FighterMeshMode mode, bool inNeutralIdle)
         {
-            if (ProceduralRootNode == null || MeshyRigRootNode == null) return;
+            // Geometry hangs off the posed bone nodes, not the empty mode roots.
+            // Toggling those roots left the coloured rig and the Meshy shell both visible.
+            bool showProcedural = mode == FighterMeshMode.ProceduralRig;
+            bool showGuardStatue = mode == FighterMeshMode.MeshyGlbWithGuardStatue
+                && inNeutralIdle
+                && MeshyGuardStatueInstance != null;
+            bool showMeshyRig = !showProcedural && !showGuardStatue;
 
-            switch (mode)
+            SetBranchVisible(ProcGeomNodes, showProcedural);
+            SetBranchVisible(MeshyGeomNodes, showMeshyRig);
+            if (ProceduralRootNode != null) ProceduralRootNode.Visible = showProcedural;
+            if (MeshyRigRootNode != null) MeshyRigRootNode.Visible = showMeshyRig;
+            if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = showGuardStatue;
+        }
+
+        private static void SetBranchVisible(Node3D[] nodes, bool visible)
+        {
+            for (int i = 0; i < nodes.Length; i++)
             {
-                case FighterMeshMode.ProceduralRig:
-                    ProceduralRootNode.Visible = true;
-                    MeshyRigRootNode.Visible = false;
-                    if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
-                    break;
-
-                case FighterMeshMode.MeshyGlbFullRig:
-                    ProceduralRootNode.Visible = false;
-                    MeshyRigRootNode.Visible = true;
-                    if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
-                    break;
-
-                case FighterMeshMode.MeshyGlbWithGuardStatue:
-                default:
-                    ProceduralRootNode.Visible = false;
-                    if (inNeutralIdle && MeshyGuardStatueInstance != null)
-                    {
-                        MeshyRigRootNode.Visible = false;
-                        MeshyGuardStatueInstance.Visible = true;
-                    }
-                    else
-                    {
-                        MeshyRigRootNode.Visible = true;
-                        if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
-                    }
-                    break;
+                if (nodes[i] != null)
+                {
+                    nodes[i].Visible = visible;
+                }
             }
         }
     }
@@ -365,12 +360,14 @@ namespace FirstFighter.Game
                 RightHandRelaxedMesh = handRelaxedR,
                 ProceduralRootNode = proceduralRoot,
                 MeshyRigRootNode = meshyRoot,
+                ProcGeomNodes = procBoneNodes,
+                MeshyGeomNodes = meshyBoneNodes,
                 MeshyGuardStatueInstance = guardStatueInst
             };
 
-            // Default to Meshy GLB mode if loaded, otherwise fallback to procedural rig
-            bool hasMeshy = MeshyGlbLoader.AssetExists();
-            builtModel.SetMeshMode(hasMeshy ? FighterMeshMode.MeshyGlbWithGuardStatue : FighterMeshMode.ProceduralRig, inNeutralIdle: true);
+            // The coloured procedural rig is the character. The Meshy shell is an optional
+            // alternate (F8), not a second body drawn on top.
+            builtModel.SetMeshMode(FighterMeshMode.ProceduralRig, inNeutralIdle: true);
 
             return builtModel;
         }

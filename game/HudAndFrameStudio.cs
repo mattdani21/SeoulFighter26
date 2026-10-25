@@ -27,7 +27,7 @@ namespace FirstFighter.Game
         private bool _inspectorActive;
         private int _inspectorMoveIndex;
         private int _inspectorTick;
-        private FighterMeshMode _meshMode = FighterMeshMode.MeshyGlbWithGuardStatue;
+        private FighterMeshMode _meshMode = FighterMeshMode.ProceduralRig;
 
         public override void _Ready()
         {
