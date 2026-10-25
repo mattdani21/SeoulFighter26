@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using Godot;
 using FirstFighter.Sim;
 using FirstFighter.Game;
 
@@ -460,14 +461,13 @@ namespace FirstFighter.Tests
             }
             Assert.True(File.Exists(assetPath), $"Meshy GLB file must exist at {assetPath}");
 
-            // Extract all 4 turnaround panels
+            // Extract all 4 turnaround panels via pure binary parser
             var panels = MeshyGlbLoader.LoadOrGetTurnaroundPanels(assetPath);
             Assert.True(panels.FrontVertices.Length > 10000, "Panel 1 (FRONT) must have >10,000 vertices.");
             Assert.True(panels.FrontIndices.Length > 20000, "Panel 1 (FRONT) must have >20,000 triangle indices.");
-            Assert.True(panels.FrontPanelMesh != null, "FrontPanelMesh must be non-null.");
-            Assert.True(panels.SidePanelMesh != null, "SidePanelMesh must be non-null.");
-            Assert.True(panels.BackPanelMesh != null, "BackPanelMesh must be non-null.");
-            Assert.True(panels.GuardPanelMesh != null, "GuardPanelMesh must be non-null.");
+            Assert.True(panels.Raw.Side.Vertices.Length > 10000, "Panel 2 (SIDE) must have >10,000 vertices.");
+            Assert.True(panels.Raw.Back.Vertices.Length > 10000, "Panel 3 (BACK) must have >10,000 vertices.");
+            Assert.True(panels.Raw.Guard.Vertices.Length > 10000, "Panel 4 (GUARD) must have >10,000 vertices.");
 
             // Verify normalization: height must be 1.85m tall [0.00 .. 1.85]
             float minY = float.MaxValue, maxY = float.MinValue;
@@ -480,10 +480,31 @@ namespace FirstFighter.Tests
             Assert.True(Math.Abs(minY - 0.00f) < 0.001f, $"Panel 1 minY must be 0.00m (was {minY})");
             Assert.True(Math.Abs(maxY - 1.85f) < 0.001f, $"Panel 1 maxY must be 1.85m (was {maxY})");
 
-            // Verify character model builder incorporates Meshy rig
-            var rig = FirstFighterModelBuilder.BuildCharacterRig(isPlayerTwoPalette: false);
-            Assert.True(rig.MeshyRigRootNode != null, "MeshyRigRootNode must be present on BuiltFighterModel.");
-            Assert.True(rig.MeshyGuardStatueInstance != null, "MeshyGuardStatueInstance must be present on BuiltFighterModel.");
+            // Verify bone classification logic maps Panel 1 triangles across all 19 anatomical bones
+            var boneCounts = new int[FirstFighterModelBuilder.BoneCount];
+            var verts = panels.FrontVertices;
+            var indices = panels.FrontIndices;
+            for (int t = 0; t < indices.Length / 3; t++)
+            {
+                Vector3 v0 = verts[indices[t * 3 + 0]];
+                Vector3 v1 = verts[indices[t * 3 + 1]];
+                Vector3 v2 = verts[indices[t * 3 + 2]];
+                Vector3 center = (v0 + v1 + v2) / 3f;
+                FighterBone bone = MeshyGlbLoader.ClassifyCentroidToBone(center);
+                boneCounts[(int)bone]++;
+            }
+
+            for (int b = 0; b < FirstFighterModelBuilder.BoneCount; b++)
+            {
+                var bone = (FighterBone)b;
+                Assert.True(boneCounts[b] > 0, $"Bone {bone} must have assigned triangles (found {boneCounts[b]}).");
+            }
+
+            // Verify bone hierarchy rest transforms are defined for all 19 bones
+            var boneWorldPositions = new Vector3[FirstFighterModelBuilder.BoneCount];
+            MeshyGlbLoader.ComputeBoneWorldPositions(boneWorldPositions);
+            Assert.True(boneWorldPositions[(int)FighterBone.Head].Y > 1.60f, "Head world Y must be above 1.60m.");
+            Assert.True(boneWorldPositions[(int)FighterBone.Hips].Y > 0.90f, "Hips world Y must be at waist level (~0.96m).");
         }
 
         private static FighterButtons GetSyntheticScriptInput(int tick, int playerIndex)

@@ -7,16 +7,41 @@ using Godot;
 
 namespace FirstFighter.Game
 {
+    public sealed class MeshyRawPanel
+    {
+        public string Name { get; init; } = "";
+        public Vector3[] Vertices { get; init; } = Array.Empty<Vector3>();
+        public int[] Indices { get; init; } = Array.Empty<int>();
+        public float MinY { get; init; }
+        public float MaxY { get; init; }
+        public float Height => MaxY - MinY;
+    }
+
+    public sealed class MeshyRawModelData
+    {
+        public MeshyRawPanel Front { get; init; } = null!;
+        public MeshyRawPanel Side { get; init; } = null!;
+        public MeshyRawPanel Back { get; init; } = null!;
+        public MeshyRawPanel Guard { get; init; } = null!;
+    }
+
     public sealed class MeshyTurnaroundPanels
     {
-        public ArrayMesh FrontPanelMesh { get; init; } = null!;
-        public ArrayMesh SidePanelMesh { get; init; } = null!;
-        public ArrayMesh BackPanelMesh { get; init; } = null!;
-        public ArrayMesh GuardPanelMesh { get; init; } = null!;
+        public MeshyRawModelData Raw { get; init; } = null!;
+
+        private ArrayMesh? _frontMesh;
+        private ArrayMesh? _sideMesh;
+        private ArrayMesh? _backMesh;
+        private ArrayMesh? _guardMesh;
+
+        public ArrayMesh FrontPanelMesh => _frontMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Front);
+        public ArrayMesh SidePanelMesh => _sideMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Side);
+        public ArrayMesh BackPanelMesh => _backMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Back);
+        public ArrayMesh GuardPanelMesh => _guardMesh ??= MeshyGlbLoader.BuildArrayMesh(Raw.Guard);
 
         // Raw vertex/index arrays for Panel 1 (FRONT) in normalized 1.85m space
-        public Vector3[] FrontVertices { get; init; } = Array.Empty<Vector3>();
-        public int[] FrontIndices { get; init; } = Array.Empty<int>();
+        public Vector3[] FrontVertices => Raw.Front.Vertices;
+        public int[] FrontIndices => Raw.Front.Indices;
     }
 
     /// <summary>
@@ -49,10 +74,8 @@ namespace FirstFighter.Game
             return File.Exists(ResolveAssetPath(path));
         }
 
-        public static MeshyTurnaroundPanels LoadOrGetTurnaroundPanels(string path = DefaultAssetPath)
+        public static MeshyRawModelData ParseGlb(string path = DefaultAssetPath)
         {
-            if (_cachedPanels != null) return _cachedPanels;
-
             string resolved = ResolveAssetPath(path);
             if (!File.Exists(resolved))
             {
@@ -117,25 +140,35 @@ namespace FirstFighter.Game
             // Gap cuts: [-1.0 .. -0.50] = FRONT, [-0.50 .. -0.13] = SIDE, [-0.13 .. 0.36] = BACK, [0.36 .. 1.0] = GUARD
             float[] cuts = { -1.0f, -0.50f, -0.13f, 0.36f, 1.0f };
 
-            var panelFront = ExtractAndNormalizePanel(allVerts, allIndices, cuts[0], cuts[1], flipZ: false);
-            var panelSide = ExtractAndNormalizePanel(allVerts, allIndices, cuts[1], cuts[2], flipZ: false);
-            var panelBack = ExtractAndNormalizePanel(allVerts, allIndices, cuts[2], cuts[3], flipZ: false);
-            var panelGuard = ExtractAndNormalizePanel(allVerts, allIndices, cuts[3], cuts[4], flipZ: false);
+            var panelFront = ExtractAndNormalizePanel("FRONT", allVerts, allIndices, cuts[0], cuts[1], flipZ: false);
+            var panelSide = ExtractAndNormalizePanel("SIDE", allVerts, allIndices, cuts[1], cuts[2], flipZ: false);
+            var panelBack = ExtractAndNormalizePanel("BACK", allVerts, allIndices, cuts[2], cuts[3], flipZ: false);
+            var panelGuard = ExtractAndNormalizePanel("GUARD", allVerts, allIndices, cuts[3], cuts[4], flipZ: false);
 
+            return new MeshyRawModelData
+            {
+                Front = panelFront,
+                Side = panelSide,
+                Back = panelBack,
+                Guard = panelGuard
+            };
+        }
+
+        public static MeshyTurnaroundPanels LoadOrGetTurnaroundPanels(string path = DefaultAssetPath)
+        {
+            if (_cachedPanels != null) return _cachedPanels;
+
+            var raw = ParseGlb(path);
             _cachedPanels = new MeshyTurnaroundPanels
             {
-                FrontPanelMesh = panelFront.mesh,
-                SidePanelMesh = panelSide.mesh,
-                BackPanelMesh = panelBack.mesh,
-                GuardPanelMesh = panelGuard.mesh,
-                FrontVertices = panelFront.normalizedVerts,
-                FrontIndices = panelFront.extractedIndices
+                Raw = raw
             };
 
             return _cachedPanels;
         }
 
-        private static (ArrayMesh mesh, Vector3[] normalizedVerts, int[] extractedIndices) ExtractAndNormalizePanel(
+        private static MeshyRawPanel ExtractAndNormalizePanel(
+            string name,
             Vector3[] allVerts,
             int[] allIndices,
             float xMinCut,
@@ -167,7 +200,14 @@ namespace FirstFighter.Game
 
             if (verts.Length == 0)
             {
-                return (new ArrayMesh(), Array.Empty<Vector3>(), Array.Empty<int>());
+                return new MeshyRawPanel
+                {
+                    Name = name,
+                    Vertices = Array.Empty<Vector3>(),
+                    Indices = Array.Empty<int>(),
+                    MinY = 0f,
+                    MaxY = 0f
+                };
             }
 
             // Compute AABB and scale to 1.85m tall (Y = [0.00, 1.85])
@@ -201,7 +241,22 @@ namespace FirstFighter.Game
                 verts[i] = new Vector3(nx, ny, nz);
             }
 
-            // Build Godot ArrayMesh with flat facet normals
+            return new MeshyRawPanel
+            {
+                Name = name,
+                Vertices = verts,
+                Indices = indices,
+                MinY = 0.00f,
+                MaxY = 1.85f
+            };
+        }
+
+        public static ArrayMesh BuildArrayMesh(MeshyRawPanel panel)
+        {
+            var verts = panel.Vertices;
+            var indices = panel.Indices;
+            if (verts.Length == 0 || indices.Length == 0) return new ArrayMesh();
+
             var st = new SurfaceTool();
             st.Begin(Mesh.PrimitiveType.Triangles);
             Color baseCol = new Color("bdac9a");
@@ -229,7 +284,7 @@ namespace FirstFighter.Game
             }
 
             st.SetMaterial(FirstFighterModelBuilder.CreateFlatFacetMaterial(Colors.White, 0.85f, useVertexColors: true));
-            return (st.Commit(), verts, indices);
+            return st.Commit();
         }
 
         private static int GetOrCreateVert(int originalIdx, Vector3[] allVerts, Dictionary<int, int> vertMap, List<Vector3> newVertsList)
@@ -330,7 +385,7 @@ namespace FirstFighter.Game
             }
         }
 
-        private static void ComputeBoneWorldPositions(Vector3[] outPos)
+        public static void ComputeBoneWorldPositions(Vector3[] outPos)
         {
             // Hierarchy parent offsets
             outPos[(int)FighterBone.Hips] = FirstFighterModelBuilder.RestOffsets[(int)FighterBone.Hips]; // (0, 0.96, 0)
@@ -361,7 +416,7 @@ namespace FirstFighter.Game
             outPos[(int)FighterBone.FootR] = outPos[(int)FighterBone.LowerLegR] + FirstFighterModelBuilder.RestOffsets[(int)FighterBone.FootR]; // (0.11, 0.06, 0.05)
         }
 
-        private static FighterBone ClassifyCentroidToBone(Vector3 p)
+        public static FighterBone ClassifyCentroidToBone(Vector3 p)
         {
             float y = p.Y;
             float x = p.X;
@@ -401,7 +456,7 @@ namespace FirstFighter.Game
             return isLeft ? FighterBone.FootL : FighterBone.FootR;
         }
 
-        private static Color DetermineFacetColor(
+        public static Color DetermineFacetColor(
             Vector3 p,
             FighterBone bone,
             Color shirtColor,
