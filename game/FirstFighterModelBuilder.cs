@@ -77,38 +77,40 @@ namespace FirstFighter.Game
         public Node3D? MeshyRigRootNode { get; set; }
         public MeshInstance3D? MeshyGuardStatueInstance { get; set; }
 
+        /// <summary>
+        /// Per-bone ProcGeom / MeshyGeom containers. Mesh mode must toggle these — the empty
+        /// ProceduralRoot / MeshyRigRoot siblings under the skeleton do not parent the geometry,
+        /// so flipping those alone left both rigs drawing (ghosted double mesh).
+        /// </summary>
+        public Node3D[] ProceduralBoneGeomNodes { get; set; } = Array.Empty<Node3D>();
+        public Node3D[] MeshyBoneGeomNodes { get; set; } = Array.Empty<Node3D>();
+
         public void SetMeshMode(FighterMeshMode mode, bool inNeutralIdle)
         {
-            if (ProceduralRootNode == null || MeshyRigRootNode == null) return;
+            bool showProcedural = mode == FighterMeshMode.ProceduralRig;
+            bool showMeshyRig = mode == FighterMeshMode.MeshyGlbFullRig ||
+                               (mode == FighterMeshMode.MeshyGlbWithGuardStatue &&
+                                !(inNeutralIdle && MeshyGuardStatueInstance != null));
+            bool showGuardStatue = mode == FighterMeshMode.MeshyGlbWithGuardStatue &&
+                                   inNeutralIdle &&
+                                   MeshyGuardStatueInstance != null;
 
-            switch (mode)
+            if (ProceduralRootNode != null) ProceduralRootNode.Visible = showProcedural;
+            if (MeshyRigRootNode != null) MeshyRigRootNode.Visible = showMeshyRig;
+            if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = showGuardStatue;
+
+            SetBoneGeomVisible(ProceduralBoneGeomNodes, showProcedural);
+            SetBoneGeomVisible(MeshyBoneGeomNodes, showMeshyRig);
+        }
+
+        private static void SetBoneGeomVisible(Node3D[] nodes, bool visible)
+        {
+            for (int i = 0; i < nodes.Length; i++)
             {
-                case FighterMeshMode.ProceduralRig:
-                    ProceduralRootNode.Visible = true;
-                    MeshyRigRootNode.Visible = false;
-                    if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
-                    break;
-
-                case FighterMeshMode.MeshyGlbFullRig:
-                    ProceduralRootNode.Visible = false;
-                    MeshyRigRootNode.Visible = true;
-                    if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
-                    break;
-
-                case FighterMeshMode.MeshyGlbWithGuardStatue:
-                default:
-                    ProceduralRootNode.Visible = false;
-                    if (inNeutralIdle && MeshyGuardStatueInstance != null)
-                    {
-                        MeshyRigRootNode.Visible = false;
-                        MeshyGuardStatueInstance.Visible = true;
-                    }
-                    else
-                    {
-                        MeshyRigRootNode.Visible = true;
-                        if (MeshyGuardStatueInstance != null) MeshyGuardStatueInstance.Visible = false;
-                    }
-                    break;
+                if (nodes[i] != null)
+                {
+                    nodes[i].Visible = visible;
+                }
             }
         }
     }
@@ -337,12 +339,19 @@ namespace FirstFighter.Game
                         LoaferUpperColor,
                         LoaferSoleColor);
 
-                    // Also prepare Panel 4 (GUARD) standalone statue for neutral guard stance
-                    var panels = MeshyGlbLoader.LoadOrGetTurnaroundPanels();
+                    // Panel 4 (GUARD) statue painted with this fighter's P1/P2 palette + UVs
                     guardStatueInst = new MeshInstance3D
                     {
                         Name = "MeshyGuardStatue",
-                        Mesh = panels.GuardPanelMesh,
+                        Mesh = MeshyGlbLoader.BuildPaletteArrayMesh(
+                            MeshyGlbLoader.LoadOrGetTurnaroundPanels().Raw.Guard,
+                            shirtColor,
+                            slacksColor,
+                            SkinBase,
+                            HairBase,
+                            BrowColor,
+                            LoaferUpperColor,
+                            LoaferSoleColor),
                         CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
                         Visible = false
                     };
@@ -365,12 +374,14 @@ namespace FirstFighter.Game
                 RightHandRelaxedMesh = handRelaxedR,
                 ProceduralRootNode = proceduralRoot,
                 MeshyRigRootNode = meshyRoot,
-                MeshyGuardStatueInstance = guardStatueInst
+                MeshyGuardStatueInstance = guardStatueInst,
+                ProceduralBoneGeomNodes = procBoneNodes,
+                MeshyBoneGeomNodes = meshyBoneNodes
             };
 
-            // Default to Meshy GLB mode if loaded, otherwise fallback to procedural rig
-            bool hasMeshy = MeshyGlbLoader.AssetExists();
-            builtModel.SetMeshMode(hasMeshy ? FighterMeshMode.MeshyGlbWithGuardStatue : FighterMeshMode.ProceduralRig, inNeutralIdle: true);
+            // Match play defaults to the multi-material procedural rig (henley / trousers / skin).
+            // F8 still cycles Meshy modes for comparison.
+            builtModel.SetMeshMode(FighterMeshMode.ProceduralRig, inNeutralIdle: true);
 
             return builtModel;
         }

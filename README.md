@@ -20,8 +20,8 @@ Inspired by Sloclap's *Sifu*, Andrea "Jens" Demetrio's *I wanna make a fighting 
 - **`game/` (Presentation Layer)**:
   - `FirstFighterModelBuilder.cs`: Procedural flat-shaded faceted 3D mesh with unindexed per-triangle normals on a 19-bone `Skeleton3D` (1.85m tall, 7.8 heads) matching `reference_first_fighter.png`.
   - `FighterPoseEngine.cs`: Non-linear keyframe snapping (`Windup -> Active -> Recovery`), 1.22x axial striking limb stretch, smear arcs, and branched Block/Whiff recovery.
-  - `StudioArenaNode.cs`: Sloclap warm taupe-grey studio lighting (`#867970`) with contact shadows and dynamic camera.
-  - `HudAndFrameStudio.cs`: Sifu-styled Structure/Guard & Meter HUD, 60-tick color-coded Frame Meter (`Cyan` Startup, `Red` Active, `Blue` Recovery, `Yellow` Stun, `Gold` Parry/Invuln), and live Frame Advantage (`+3 ON HIT`, `-4 ON BLOCK`).
+  - `SeoulNightStage.cs` / `StudioArenaNode.cs`: Cheonggyecheon night arena — stepped promenade, reflective canal, multi-bay facades, framed neon, bloom/fog; warm streetlamp key + cyan rim. F9 keeps the taupe studio cyclorama.
+  - `HudAndFrameStudio.cs`: Match HUD with damage-trail health bars, segmented meter, round timer/pips, Round/FIGHT/K.O. callouts. `F6` training overlay adds the frame meter. Default fighter mesh is the multi-material `ProceduralRig`.
 - **`tests/` (Verification Suite)**:
   - 8 headless deterministic verification tests verifying netcode determinism, high whiff on crouch, guard matrix, priority parser, anti-infinite pushback scaling, 11-hit golden combo, sim purity, and model bone anatomy.
 
@@ -61,10 +61,11 @@ Inspired by Sloclap's *Sifu*, Andrea "Jens" Demetrio's *I wanna make a fighting 
   - `I`: Throw (`L+M`)
   - `O`: Super Art (`236H+S`)
 - **Studio Tools**:
-  - `F1`: Toggle 3D Collision boxes (Pushbox: Green, Hurtbox: Blue, Hitbox: Red)
+  - `F1`: Toggle 3D Collision boxes (off by default; Pushbox: Green, Hurtbox: Blue, Hitbox: Red)
   - `F2`: Pause / Step 1 tick forward (`Space` resumes)
   - `F3`: Cycle dummy mode (`Stand`, `Crouch`, `AutoBlock`, `CounterJab`, `AiSparring`)
   - `F4`: Play the **11-Hit Golden Combo** showcase live
+  - `F6`: Toggle training overlay (frame meter, hotkeys, telemetry)
   - `F9`: **Turnaround & 12-Move Inspector Mode** (`Up`/`Down` selects move, `Left`/`Right` scrubs ticks)
   - `R`: Reset match state & meter
 

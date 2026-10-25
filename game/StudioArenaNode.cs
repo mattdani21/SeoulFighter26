@@ -5,23 +5,25 @@ using FirstFighter.Sim;
 namespace FirstFighter.Game
 {
     /// <summary>
-    /// Sloclap (Sifu / Absolver) Studio Arena environment matching reference_first_fighter.jpg:
-    /// #867970 warm taupe-grey backdrop, #8e8178 matte studio floor, 3-point directional lighting
-    /// for crisp flat-shaded facets, and dynamic 2.5D + Super zoom camera.
-    ///
-    /// Surfaces are textured from code (see <see cref="ProceduralTextures"/>): the floor carries
-    /// concrete albedo, aggregate normal and roughness variation with the 1m reference grid baked
-    /// straight into the albedo, and the cyclorama wall carries plaster grain plus a world-space
-    /// grounding fade. Baking the grid into the albedo removes the thin-line geometry that used to
-    /// shimmer and z-fight against the floor plane.
+    /// Arena host: Cheonggyecheon night for match play, Sloclap taupe cyclorama for F9 turnaround.
+    /// Owns the 3-point light rig and dynamic 2.5D + Super zoom camera.
     /// </summary>
     public partial class StudioArenaNode : Node3D
     {
-        public static readonly Color BackdropColor = new Color("867970");
-        public static readonly Color FloorColor = new Color("8e8178");
+        public static readonly Color StudioBackdropColor = new Color("867970");
+        public static readonly Color StudioFloorColor = new Color("8e8178");
+        public static readonly Color NightAmbientColor = new Color("243048");
+        public static readonly Color NightKeyColor = new Color("ffe8cc");
+        public static readonly Color NightFillColor = new Color("7a9ab8");
+        public static readonly Color NightRimColor = new Color("5ac8d4");
+        public static readonly Color StudioAmbientColor = new Color("9c9088");
+        public static readonly Color StudioFillColor = new Color("d8cfc8");
+        public static readonly Color StudioRimColor = new Color("efe6dc");
 
-        // The floor plane is 24m x 16m and its texture is authored 1:1 against those extents, so
-        // the baked metre grid stays exactly 1m regardless of camera or UV scale.
+        // Kept for callers / evidence docs that still name the studio palette.
+        public static readonly Color BackdropColor = StudioBackdropColor;
+        public static readonly Color FloorColor = StudioFloorColor;
+
         private const float FloorWidth = 24f;
         private const float FloorDepth = 16f;
         private const float WallWidth = 28f;
@@ -33,12 +35,20 @@ namespace FirstFighter.Game
         private DirectionalLight3D _fillLight = null!;
         private DirectionalLight3D _rimLight = null!;
         private WorldEnvironment _worldEnv = null!;
+        private Node3D _studioRoot = null!;
+        private SeoulNightStage _seoulStage = null!;
+        private bool _inspectorMode;
+
+        /// <summary>0..1 bias applied during K.O. finish for a slight dramatic zoom.</summary>
+        public float KoCameraZoom { get; set; }
 
         public override void _Ready()
         {
             BuildEnvironmentAndLighting();
-            BuildStudioFloorAndGrid();
+            BuildStudioRoot();
+            BuildSeoulStage();
             BuildCameraRig();
+            ApplyMatchNightLook();
         }
 
         private void BuildEnvironmentAndLighting()
@@ -46,69 +56,74 @@ namespace FirstFighter.Game
             var env = new Godot.Environment
             {
                 BackgroundMode = Godot.Environment.BGMode.Color,
-                BackgroundColor = BackdropColor,
+                BackgroundColor = SeoulNightStage.SkyZenith,
                 AmbientLightSource = Godot.Environment.AmbientSource.Color,
-                AmbientLightColor = new Color("9c9088"),
-                AmbientLightEnergy = 0.58f,
+                AmbientLightColor = NightAmbientColor,
+                AmbientLightEnergy = 0.52f,
                 TonemapMode = Godot.Environment.ToneMapper.Linear,
-                TonemapExposure = 1.0f
+                TonemapExposure = 1.0f,
+                GlowEnabled = true,
+                GlowIntensity = 0.55f,
+                GlowStrength = 0.85f,
+                GlowBloom = 0.18f,
+                GlowHdrThreshold = 0.72f,
+                FogEnabled = true,
+                FogLightColor = new Color("1a2438"),
+                FogDensity = 0.0085f,
+                FogAerialPerspective = 0.35f,
+                FogSkyAffect = 0.15f
             };
             _worldEnv = new WorldEnvironment
             {
-                Name = "StudioWorldEnvironment",
+                Name = "ArenaWorldEnvironment",
                 Environment = env
             };
             AddChild(_worldEnv);
 
-            // Key Light: warm studio top-front-left directional light that brings out flat polygon facets without blowouts
+            // Warm streetlamp key so oatmeal henley / skin stay readable against cool night fill.
             _keyLight = new DirectionalLight3D
             {
                 Name = "KeyLight3D",
-                LightColor = new Color("fff7ed"),
-                LightEnergy = 0.92f,
+                LightColor = NightKeyColor,
+                LightEnergy = 1.05f,
                 ShadowEnabled = true,
-                ShadowOpacity = 0.42f,
-                RotationDegrees = new Vector3(-46f, -32f, 0f)
+                ShadowOpacity = 0.36f,
+                RotationDegrees = new Vector3(-44f, -28f, 0f)
             };
             AddChild(_keyLight);
 
-            // Fill Light: soft cool-taupe opposite fill so shadow facets match #9c8c7b / #221f1c
+            // Cool Cheonggyecheon water-bounce fill
             _fillLight = new DirectionalLight3D
             {
                 Name = "FillLight3D",
-                LightColor = new Color("d8cfc8"),
-                LightEnergy = 0.36f,
+                LightColor = NightFillColor,
+                LightEnergy = 0.42f,
                 ShadowEnabled = false,
-                RotationDegrees = new Vector3(-28f, 142f, 0f)
+                RotationDegrees = new Vector3(-22f, 148f, 0f)
             };
             AddChild(_fillLight);
 
-            // Rim Light: subtle back-top separation rim
+            // Crisp cyan/amber city rim so faceted limbs catch neon
             _rimLight = new DirectionalLight3D
             {
                 Name = "RimLight3D",
-                LightColor = new Color("efe6dc"),
-                LightEnergy = 0.28f,
+                LightColor = NightRimColor,
+                LightEnergy = 0.42f,
                 ShadowEnabled = false,
-                RotationDegrees = new Vector3(-62f, 180f, 0f)
+                RotationDegrees = new Vector3(-55f, 175f, 0f)
             };
             AddChild(_rimLight);
         }
 
-        private void BuildStudioFloorAndGrid()
+        private void BuildStudioRoot()
         {
-            // Matte studio floor: concrete albedo (metre grid baked in), aggregate normal map and
-            // roughness variation. The texture is authored 1:1 against the plane extents, so no UV
-            // scaling is applied and the grid can never drift out of alignment or alias against
-            // geometry.
-            var floorMesh = new PlaneMesh
-            {
-                Size = new Vector2(FloorWidth, FloorDepth)
-            };
+            _studioRoot = new Node3D { Name = "StudioCyclorama", Visible = false };
+            AddChild(_studioRoot);
+
+            var floorMesh = new PlaneMesh { Size = new Vector2(FloorWidth, FloorDepth) };
             var floorMat = new StandardMaterial3D
             {
-                // Divided by the texture's mean so the authored palette value lands exactly.
-                AlbedoColor = FloorColor * (1f / ProceduralTextures.FloorMean),
+                AlbedoColor = StudioFloorColor * (1f / ProceduralTextures.FloorMean),
                 AlbedoTexture = ProceduralTextures.StageFloorAlbedo(),
                 Roughness = 0.94f,
                 Metallic = 0.0f,
@@ -119,47 +134,36 @@ namespace FirstFighter.Game
                 RoughnessTextureChannel = BaseMaterial3D.TextureChannel.Red,
                 TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic
             };
-            var floorInst = new MeshInstance3D
+            _studioRoot.AddChild(new MeshInstance3D
             {
                 Name = "StudioFloor",
                 Mesh = floorMesh,
                 MaterialOverride = floorMat
-            };
-            AddChild(floorInst);
+            });
 
-            BuildBackdropWall();
-        }
-
-        private void BuildBackdropWall()
-        {
-            var wallMesh = new PlaneMesh
-            {
-                Size = new Vector2(WallWidth, WallHeight)
-            };
-
-            // Unshaded, like a lit cyclorama rather than a lit object. The plaster grain and the
-            // grounding fade are baked into the albedo texture (which runs v = 0 at the top edge for
-            // this +90 deg X rotation), so the wall needs no custom shader and its colour is exact:
-            // AlbedoColor is divided by the detail mean, exactly as the character materials are.
             var wallMat = new StandardMaterial3D
             {
-                AlbedoColor = BackdropColor * (1f / ProceduralTextures.WallMean),
+                AlbedoColor = StudioBackdropColor * (1f / ProceduralTextures.WallMean),
                 AlbedoTexture = ProceduralTextures.StageWallAlbedo(),
                 Roughness = 0.96f,
                 Metallic = 0.0f,
                 ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
                 TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic
             };
-
-            var wallInst = new MeshInstance3D
+            _studioRoot.AddChild(new MeshInstance3D
             {
                 Name = "StudioBackdropWall",
-                Mesh = wallMesh,
+                Mesh = new PlaneMesh { Size = new Vector2(WallWidth, WallHeight) },
                 MaterialOverride = wallMat,
                 Position = new Vector3(0f, WallHeight * 0.5f + WallBottomY, -3.8f),
                 RotationDegrees = new Vector3(90f, 0f, 0f)
-            };
-            AddChild(wallInst);
+            });
+        }
+
+        private void BuildSeoulStage()
+        {
+            _seoulStage = new SeoulNightStage { Name = "SeoulNightStage" };
+            AddChild(_seoulStage);
         }
 
         private void BuildCameraRig()
@@ -175,16 +179,64 @@ namespace FirstFighter.Game
             AddChild(ArenaCamera);
         }
 
+        private void ApplyMatchNightLook()
+        {
+            _inspectorMode = false;
+            _studioRoot.Visible = false;
+            _seoulStage.Visible = true;
+            var env = _worldEnv.Environment;
+            env.BackgroundColor = SeoulNightStage.SkyZenith;
+            env.AmbientLightColor = NightAmbientColor;
+            env.AmbientLightEnergy = 0.52f;
+            env.GlowEnabled = true;
+            env.FogEnabled = true;
+            _keyLight.LightColor = NightKeyColor;
+            _keyLight.LightEnergy = 1.05f;
+            _fillLight.LightColor = NightFillColor;
+            _fillLight.LightEnergy = 0.42f;
+            _rimLight.LightColor = NightRimColor;
+            _rimLight.LightEnergy = 0.42f;
+            _seoulStage.SetSuperCinema(false);
+        }
+
+        private void ApplyStudioTurnaroundLook()
+        {
+            _inspectorMode = true;
+            _studioRoot.Visible = true;
+            _seoulStage.Visible = false;
+            var env = _worldEnv.Environment;
+            env.BackgroundColor = StudioBackdropColor;
+            env.AmbientLightColor = StudioAmbientColor;
+            env.AmbientLightEnergy = 0.58f;
+            env.GlowEnabled = false;
+            env.FogEnabled = false;
+            _keyLight.LightColor = new Color("fff7ed");
+            _keyLight.LightEnergy = 0.92f;
+            _fillLight.LightColor = StudioFillColor;
+            _fillLight.LightEnergy = 0.36f;
+            _rimLight.LightColor = StudioRimColor;
+            _rimLight.LightEnergy = 0.28f;
+        }
+
         public void UpdateCameraForMatch(MatchState state, bool turnaroundInspectorActive, float deltaSec)
         {
             if (turnaroundInspectorActive)
             {
-                // Frame the 4-panel turnaround lineup + active move inspector cleanly
+                if (!_inspectorMode)
+                {
+                    ApplyStudioTurnaroundLook();
+                }
+
                 Vector3 inspectorPos = new Vector3(0f, 1.06f, 3.65f);
                 ArenaCamera.Position = ArenaCamera.Position.Lerp(inspectorPos, Mathf.Clamp(deltaSec * 10f, 0f, 1f));
                 ArenaCamera.LookAt(new Vector3(0f, 0.98f, 0f), Vector3.Up);
                 _keyLight.LightEnergy = 0.92f;
                 return;
+            }
+
+            if (_inspectorMode)
+            {
+                ApplyMatchNightLook();
             }
 
             float p1X = state.Fighters[0].X.ToMilli() * 0.001f;
@@ -196,7 +248,6 @@ namespace FirstFighter.Game
             float maxAirY = Mathf.Max(p1Y, p2Y);
             float spanX = Mathf.Abs(p1X - p2X);
 
-            // Dramatic 24-tick studio camera zoom & spotlight dim during 236H+S Super Art!
             bool superCinema = state.SuperFlashTicks > 0 ||
                                state.Fighters[0].CurrentMoveId == MoveId.SuperArt ||
                                state.Fighters[1].CurrentMoveId == MoveId.SuperArt;
@@ -208,13 +259,19 @@ namespace FirstFighter.Game
             {
                 targetZ = 2.55f;
                 targetY = 1.18f;
-                _keyLight.LightEnergy = 1.15f;
-                _worldEnv.Environment.BackgroundColor = BackdropColor.Darkened(0.28f);
+                _keyLight.LightEnergy = 1.18f;
+                _worldEnv.Environment.BackgroundColor = SeoulNightStage.SkyZenith.Darkened(0.35f);
+                _seoulStage.SetSuperCinema(true);
             }
             else
             {
-                _keyLight.LightEnergy = 0.92f;
-                _worldEnv.Environment.BackgroundColor = BackdropColor;
+                _keyLight.LightEnergy = 1.05f;
+                _worldEnv.Environment.BackgroundColor = SeoulNightStage.SkyZenith;
+                _seoulStage.SetSuperCinema(false);
+                if (KoCameraZoom > 0.01f)
+                {
+                    targetZ = Mathf.Lerp(targetZ, 2.70f, Mathf.Clamp(KoCameraZoom, 0f, 1f));
+                }
             }
 
             Vector3 desiredCam = new Vector3(midX, targetY, targetZ);

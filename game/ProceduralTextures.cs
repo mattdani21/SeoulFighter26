@@ -57,6 +57,15 @@ namespace FirstFighter.Game
 
         public const float WallMean = 0.86f;
 
+        /// <summary>Dark wet granite for the Cheonggyecheon night plaza — deeper mean than studio concrete.</summary>
+        public const float NightGraniteMean = 0.62f;
+
+        public const float NightSkyMean = 0.78f;
+
+        public const float NightWaterMean = 0.70f;
+
+        public const float NightStoneMean = 0.72f;
+
         private static readonly Dictionary<string, ImageTexture> Cache = new();
 
         // ------------------------------------------------------------------
@@ -78,6 +87,28 @@ namespace FirstFighter.Game
 
         /// <summary>Plaster grain plus the baked grounding fade for the cyclorama wall.</summary>
         public static ImageTexture StageWallAlbedo() => Cached("wall_albedo", BuildWallAlbedo);
+
+        /// <summary>Dark wet granite plaza — no metre grid; soft specular wetness lives in roughness.</summary>
+        public static ImageTexture NightGraniteAlbedo() => Cached("night_granite_albedo", BuildNightGraniteAlbedo);
+
+        public static ImageTexture NightGraniteNormal() => Cached("night_granite_normal", BuildNightGraniteNormal);
+
+        public static ImageTexture NightGraniteRoughness() => Cached("night_granite_rough", BuildNightGraniteRoughness);
+
+        /// <summary>Vertical night sky gradient for the far unshaded cyclorama (v=0 top, v=1 horizon).</summary>
+        public static ImageTexture NightSkyAlbedo() => Cached("night_sky_albedo", BuildNightSkyAlbedo);
+
+        /// <summary>Still canal water: soft lengthwise streak, cool tonal drift, light reflection bands.</summary>
+        public static ImageTexture NightWaterAlbedo() => Cached("night_water_albedo", BuildNightWaterAlbedo);
+
+        /// <summary>Ripple normal map for the Cheonggyecheon canal surface.</summary>
+        public static ImageTexture NightWaterNormal() => Cached("night_water_normal", BuildNightWaterNormal);
+
+        /// <summary>Cool grey cut stone for embankment / coping faces.</summary>
+        public static ImageTexture NightStoneAlbedo() => Cached("night_stone_albedo", BuildNightStoneAlbedo);
+
+        /// <summary>Facade plaster / concrete for mid-rise Seoul buildings.</summary>
+        public static ImageTexture NightFacadeAlbedo() => Cached("night_facade_albedo", BuildNightFacadeAlbedo);
 
         // ------------------------------------------------------------------
         // Character
@@ -249,6 +280,153 @@ namespace FirstFighter.Game
             }
 
             return WriteDetailField(values, WallPixelsW, WallPixelsH, WallMean);
+        }
+
+        private static Image BuildNightGraniteAlbedo()
+        {
+            float[] broad = Fbm(FloorPixelsW, FloorPixelsH, 5107, 0.014f, 4, 0.55f);
+            float[] medium = Fbm(FloorPixelsW, FloorPixelsH, 5203, 0.055f, 3, 0.50f);
+            float[] grit = Fbm(FloorPixelsW, FloorPixelsH, 5309, 0.22f, 2, 0.45f);
+            float[] wet = Fbm(FloorPixelsW, FloorPixelsH, 5401, 0.008f, 3, 0.55f);
+            var values = new float[FloorPixelsW * FloorPixelsH];
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                float v = 1.0f
+                          + (broad[i] - 0.5f) * 0.140f
+                          + (medium[i] - 0.5f) * 0.080f
+                          + (grit[i] - 0.5f) * 0.035f;
+
+                // Soft wet patches — cooler darkening, no printed grid.
+                float damp = Mathf.Clamp((wet[i] - 0.42f) * 1.8f, 0f, 1f);
+                v -= damp * 0.085f;
+
+                values[i] = v;
+            }
+
+            return WriteDetailField(values, FloorPixelsW, FloorPixelsH, NightGraniteMean);
+        }
+
+        private static Image BuildNightGraniteNormal()
+        {
+            float[] height = Fbm(FloorPixelsW, FloorPixelsH, 5503, 0.14f, 3, 0.48f);
+            return HeightToNormal(FloorPixelsW, FloorPixelsH, height, strength: 2.6f, wrap: false);
+        }
+
+        private static Image BuildNightGraniteRoughness()
+        {
+            float[] grain = Fbm(FloorPixelsW, FloorPixelsH, 5609, 0.07f, 3, 0.50f);
+            float[] wet = Fbm(FloorPixelsW, FloorPixelsH, 5401, 0.008f, 3, 0.55f);
+            var data = new byte[FloorPixelsW * FloorPixelsH * 3];
+
+            for (int i = 0; i < FloorPixelsW * FloorPixelsH; i++)
+            {
+                // Base stone is fairly rough; wet patches drop roughness for soft night sheen.
+                float r = 0.78f + (grain[i] - 0.5f) * 0.10f;
+                float damp = Mathf.Clamp((wet[i] - 0.42f) * 1.8f, 0f, 1f);
+                r -= damp * 0.42f;
+
+                byte b = ToByte(r);
+                data[i * 3] = b;
+                data[i * 3 + 1] = b;
+                data[i * 3 + 2] = b;
+            }
+
+            return Finish(Image.CreateFromData(FloorPixelsW, FloorPixelsH, false, Image.Format.Rgb8, data));
+        }
+
+        private static Image BuildNightSkyAlbedo()
+        {
+            float[] haze = Fbm(WallPixelsW, WallPixelsH, 6103, 0.012f, 3, 0.50f);
+            var values = new float[WallPixelsW * WallPixelsH];
+
+            for (int y = 0; y < WallPixelsH; y++)
+            {
+                // After +90° X on a PlaneMesh, v=0 is the top edge (zenith) and v=1 the horizon.
+                float v = y / (float)(WallPixelsH - 1);
+                float gradient = Mathf.Lerp(0.55f, 1.18f, Mathf.Pow(v, 1.35f));
+
+                for (int x = 0; x < WallPixelsW; x++)
+                {
+                    int i = y * WallPixelsW + x;
+                    float grain = (haze[i] - 0.5f) * 0.06f;
+                    values[i] = gradient * (1f + grain);
+                }
+            }
+
+            return WriteDetailField(values, WallPixelsW, WallPixelsH, NightSkyMean);
+        }
+
+        private static Image BuildNightWaterAlbedo()
+        {
+            const int w = 512;
+            const int h = 256;
+            float[] length = FbmAnisotropic(w, h, 7109, 0.040f, 3, stretchY: 3.2f);
+            float[] broad = Fbm(w, h, 7203, 0.018f, 3, 0.50f);
+            var values = new float[w * h];
+
+            for (int y = 0; y < h; y++)
+            {
+                float v = y / (float)(h - 1);
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x;
+                    float streak = 1f
+                                   + (length[i] - 0.5f) * 0.14f
+                                   + (broad[i] - 0.5f) * 0.06f;
+
+                    // Soft vertical reflection bands under embankment LEDs / neon.
+                    float band = Mathf.Sin((x / (float)w) * Mathf.Tau * 5.5f + v * 1.2f);
+                    float glow = Mathf.Clamp(band * 0.55f + 0.45f, 0f, 1f);
+                    streak += glow * 0.12f * (0.55f + 0.45f * (1f - v));
+
+                    values[i] = streak;
+                }
+            }
+
+            return WriteDetailField(values, w, h, NightWaterMean);
+        }
+
+        private static Image BuildNightWaterNormal()
+        {
+            const int w = 512;
+            const int h = 256;
+            float[] ripples = FbmAnisotropic(w, h, 7301, 0.085f, 3, stretchY: 4.5f);
+            return HeightToNormal(w, h, ripples, strength: 2.8f, wrap: true);
+        }
+
+        private static Image BuildNightStoneAlbedo()
+        {
+            const int size = 512;
+            float[] broad = Fbm(size, size, 8107, 0.020f, 3, 0.52f);
+            float[] fine = Fbm(size, size, 8203, 0.18f, 2, 0.45f);
+            var values = new float[size * size];
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                values[i] = 1f
+                            + (broad[i] - 0.5f) * 0.10f
+                            + (fine[i] - 0.5f) * 0.04f;
+            }
+
+            return WriteDetailField(values, size, size, NightStoneMean);
+        }
+
+        private static Image BuildNightFacadeAlbedo()
+        {
+            const int size = 512;
+            float[] broad = Fbm(size, size, 9103, 0.016f, 3, 0.50f);
+            float[] fine = Fbm(size, size, 9209, 0.22f, 2, 0.45f);
+            var values = new float[size * size];
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                values[i] = 1f
+                            + (broad[i] - 0.5f) * 0.08f
+                            + (fine[i] - 0.5f) * 0.035f;
+            }
+
+            return WriteDetailField(values, size, size, NightStoneMean);
         }
 
         private static Image BuildClothAlbedo(int seed, float weaveStrength, float slubStrength)

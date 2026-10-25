@@ -7,8 +7,8 @@ namespace FirstFighter.Game
 {
     /// <summary>
     /// Root scene controller coordinating the 60 Hz deterministic MatchSim,
-    /// P1 & P2 FighterVisualNodes, Sloclap StudioArenaNode, F9 Turnaround & Move Inspector,
-    /// and live Golden 11-Hit Showcase Combo playback (F4).
+    /// P1 & P2 FighterVisualNodes, Cheonggyecheon night arena (studio cyclorama on F9),
+    /// clean match HUD with F6 training overlay, and Golden 11-Hit Showcase (F4).
     /// </summary>
     public partial class MainController : Node3D
     {
@@ -23,7 +23,8 @@ namespace FirstFighter.Game
         private readonly FighterVisualNode[] _turnaroundMannequins = new FighterVisualNode[3];
         private FighterState _inspectorPreviewState = new FighterState();
 
-        private bool _showDebugBoxes = true;
+        private bool _showDebugBoxes;
+        private bool _trainingOverlay;
         private bool _paused;
         private bool _stepSingleTickRequested;
         private DummyBehaviorMode _dummyMode = DummyBehaviorMode.Stand;
@@ -32,13 +33,24 @@ namespace FirstFighter.Game
         private int _inspectorMoveIndex;
         private int _inspectorTick;
 
+        // Match presentation (skipped when F6 training overlay is on)
+        private MatchPhase _matchPhase = MatchPhase.RoundIntro;
+        private int _phaseTick;
+        private int _roundNumber = 1;
+        private int _timerSeconds = 99;
+        private int _timerTickAccum;
+        private int _p1Wins;
+        private int _p2Wins;
+        private const int RoundIntroTicks = 75;
+        private const int KoFinishTicks = 90;
+
         // Live Golden Combo script queue (triggered via F4)
         private readonly Queue<FighterButtons> _goldenComboScriptQueue = new Queue<FighterButtons>();
 
         // Key edge tracking
-        private bool _prevF1, _prevF2, _prevF3, _prevF4, _prevF8, _prevF9, _prevSpace, _prevR;
+        private bool _prevF1, _prevF2, _prevF3, _prevF4, _prevF6, _prevF8, _prevF9, _prevSpace, _prevR;
         private bool _prevLeft, _prevRight, _prevUp, _prevDown;
-        private FighterMeshMode _globalMeshMode = FighterMeshMode.MeshyGlbWithGuardStatue;
+        private FighterMeshMode _globalMeshMode = FighterMeshMode.ProceduralRig;
 
         public override void _Ready()
         {
@@ -73,6 +85,21 @@ namespace FirstFighter.Game
 
             SimState.Reset();
             SimState.Fighters[0].Meter = 100; // Start with full Super meter so 236H+S can be tested immediately
+            BeginRoundIntro();
+
+            // Movie Maker evidence captures: play the golden combo after a short settle so
+            // still/motion frames show the night stage under a real match sequence.
+            if (!string.IsNullOrEmpty(Engine.GetWriteMoviePath()))
+            {
+                _trainingOverlay = true; // uninterrupted labbing for motion evidence
+                _matchPhase = MatchPhase.ActiveMatch;
+                for (int i = 0; i < 45; i++)
+                {
+                    _goldenComboScriptQueue.Enqueue(FighterButtons.None);
+                }
+                EnqueueGoldenComboShowcase();
+            }
+
             SyncPresentation(1f / 60f);
         }
 
@@ -95,27 +122,113 @@ namespace FirstFighter.Game
             if (!_paused || _stepSingleTickRequested)
             {
                 _stepSingleTickRequested = false;
-
-                FighterButtons p1Input = _goldenComboScriptQueue.Count > 0
-                    ? _goldenComboScriptQueue.Dequeue()
-                    : SamplePlayerOneKeyboard(SimState.Fighters[0].FacingRight);
-
-                FighterButtons p2Input = ComputeDummyInput(SimState, _dummyMode);
-
-                MatchSim.Step(SimState, p1Input, p2Input);
-
-                // Auto-refill health when a fighter is KO'd in Studio training mode
-                if (SimState.Fighters[0].Health <= 0 && SimState.Fighters[0].State == FighterStateKind.Idle)
-                {
-                    SimState.Fighters[0].Health = FighterCatalog.FirstFighter.MaxHealth;
-                }
-                if (SimState.Fighters[1].Health <= 0 && SimState.Fighters[1].State == FighterStateKind.Idle)
-                {
-                    SimState.Fighters[1].Health = FighterCatalog.FirstFighter.MaxHealth;
-                }
+                StepMatchPresentation();
             }
 
             SyncPresentation((float)delta);
+        }
+
+        private void StepMatchPresentation()
+        {
+            // Training lab: always step sim and instantly refill HP on KO.
+            if (_trainingOverlay)
+            {
+                StepSimWithInputs();
+                if (SimState.Fighters[0].Health <= 0 && SimState.Fighters[0].State == FighterStateKind.Idle)
+                    SimState.Fighters[0].Health = FighterCatalog.FirstFighter.MaxHealth;
+                if (SimState.Fighters[1].Health <= 0 && SimState.Fighters[1].State == FighterStateKind.Idle)
+                    SimState.Fighters[1].Health = FighterCatalog.FirstFighter.MaxHealth;
+                return;
+            }
+
+            switch (_matchPhase)
+            {
+                case MatchPhase.RoundIntro:
+                    _phaseTick++;
+                    // Hold fighters still during intro; still advance a quiet sim tick for idle breathing.
+                    MatchSim.Step(SimState, FighterButtons.None, FighterButtons.None);
+                    if (_phaseTick >= RoundIntroTicks)
+                    {
+                        _matchPhase = MatchPhase.ActiveMatch;
+                        _phaseTick = 0;
+                    }
+                    break;
+
+                case MatchPhase.ActiveMatch:
+                    StepSimWithInputs();
+                    _timerTickAccum++;
+                    if (_timerTickAccum >= 60)
+                    {
+                        _timerTickAccum = 0;
+                        if (_timerSeconds > 0) _timerSeconds--;
+                    }
+
+                    bool p1Ko = SimState.Fighters[0].Health <= 0;
+                    bool p2Ko = SimState.Fighters[1].Health <= 0;
+                    bool timeUp = _timerSeconds <= 0;
+                    if (p1Ko || p2Ko || timeUp)
+                    {
+                        _matchPhase = MatchPhase.KoFinish;
+                        _phaseTick = 0;
+                        if (p2Ko && !p1Ko) _p1Wins++;
+                        else if (p1Ko && !p2Ko) _p2Wins++;
+                        else
+                        {
+                            // Time up / double KO: award to higher remaining HP
+                            if (SimState.Fighters[0].Health >= SimState.Fighters[1].Health) _p1Wins++;
+                            else _p2Wins++;
+                        }
+                    }
+                    break;
+
+                case MatchPhase.KoFinish:
+                    _phaseTick++;
+                    // Freeze inputs; keep ticking so hitstun settles.
+                    MatchSim.Step(SimState, FighterButtons.None, FighterButtons.None);
+                    if (_phaseTick >= KoFinishTicks)
+                    {
+                        if (_p1Wins >= 2 || _p2Wins >= 2)
+                        {
+                            _p1Wins = 0;
+                            _p2Wins = 0;
+                            _roundNumber = 1;
+                        }
+                        else
+                        {
+                            _roundNumber++;
+                        }
+                        ResetRoundState();
+                        BeginRoundIntro();
+                    }
+                    break;
+            }
+        }
+
+        private void StepSimWithInputs()
+        {
+            FighterButtons p1Input = _goldenComboScriptQueue.Count > 0
+                ? _goldenComboScriptQueue.Dequeue()
+                : SamplePlayerOneKeyboard(SimState.Fighters[0].FacingRight);
+            FighterButtons p2Input = ComputeDummyInput(SimState, _dummyMode);
+            MatchSim.Step(SimState, p1Input, p2Input);
+        }
+
+        private void BeginRoundIntro()
+        {
+            _matchPhase = MatchPhase.RoundIntro;
+            _phaseTick = 0;
+            _timerSeconds = 99;
+            _timerTickAccum = 0;
+        }
+
+        private void ResetRoundState()
+        {
+            int meter0 = SimState.Fighters[0].Meter;
+            int meter1 = SimState.Fighters[1].Meter;
+            SimState.Reset();
+            SimState.Fighters[0].Meter = Math.Max(meter0, 50);
+            SimState.Fighters[1].Meter = Math.Max(meter1, 50);
+            _goldenComboScriptQueue.Clear();
         }
 
         private void SyncPresentation(float deltaSec)
@@ -124,6 +237,10 @@ namespace FirstFighter.Game
             P2Visual.CurrentMeshMode = _globalMeshMode;
             P1Visual.SyncFromSimState(SimState.Fighters[0], SimState.Tick, _showDebugBoxes, deltaSec);
             P2Visual.SyncFromSimState(SimState.Fighters[1], SimState.Tick, _showDebugBoxes, deltaSec);
+
+            // Slight KO camera zoom during finish
+            float camZoomBias = (!_trainingOverlay && _matchPhase == MatchPhase.KoFinish) ? 0.35f : 0f;
+            Arena.KoCameraZoom = camZoomBias;
             Arena.UpdateCameraForMatch(SimState, _turnaroundInspectorActive, deltaSec);
             HudStudio.SyncHudState(
                 SimState,
@@ -133,7 +250,14 @@ namespace FirstFighter.Game
                 _turnaroundInspectorActive,
                 _inspectorMoveIndex,
                 _inspectorTick,
-                _globalMeshMode);
+                _globalMeshMode,
+                _trainingOverlay,
+                _matchPhase,
+                _roundNumber,
+                _timerSeconds,
+                _p1Wins,
+                _p2Wins,
+                _phaseTick);
         }
 
         private void UpdateTurnaroundInspectorScene(float deltaSec)
@@ -211,7 +335,8 @@ namespace FirstFighter.Game
                 _turnaroundInspectorActive,
                 _inspectorMoveIndex,
                 _inspectorTick,
-                _globalMeshMode);
+                _globalMeshMode,
+                _trainingOverlay);
         }
 
         private void HandleStudioHotkeys()
@@ -220,6 +345,7 @@ namespace FirstFighter.Game
             bool f2 = Input.IsPhysicalKeyPressed(Key.F2);
             bool f3 = Input.IsPhysicalKeyPressed(Key.F3);
             bool f4 = Input.IsPhysicalKeyPressed(Key.F4);
+            bool f6 = Input.IsPhysicalKeyPressed(Key.F6);
             bool f8 = Input.IsPhysicalKeyPressed(Key.F8);
             bool f9 = Input.IsPhysicalKeyPressed(Key.F9);
             bool space = Input.IsPhysicalKeyPressed(Key.Space);
@@ -249,6 +375,10 @@ namespace FirstFighter.Game
             {
                 EnqueueGoldenComboShowcase();
             }
+            if (f6 && !_prevF6)
+            {
+                _trainingOverlay = !_trainingOverlay;
+            }
             if (f8 && !_prevF8)
             {
                 _globalMeshMode = (FighterMeshMode)(((int)_globalMeshMode + 1) % 3);
@@ -263,6 +393,10 @@ namespace FirstFighter.Game
                 _goldenComboScriptQueue.Clear();
                 SimState.Reset();
                 SimState.Fighters[0].Meter = 100;
+                _p1Wins = 0;
+                _p2Wins = 0;
+                _roundNumber = 1;
+                BeginRoundIntro();
             }
 
             if (_turnaroundInspectorActive)
@@ -304,6 +438,7 @@ namespace FirstFighter.Game
             _prevF2 = f2;
             _prevF3 = f3;
             _prevF4 = f4;
+            _prevF6 = f6;
             _prevF8 = f8;
             _prevF9 = f9;
             _prevSpace = space;
