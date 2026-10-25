@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\sim\FirstFighter.Sim.csproj" />
     <Compile Include="..\game\FirstFighterModelBuilder.cs" Link="FirstFighterModelBuilder.cs" />
+    <Compile Include="..\game\ProceduralTextures.cs" Link="ProceduralTextures.cs" />
     <Compile Include="..\game\FighterPoseEngine.cs" Link="FighterPoseEngine.cs" />
     <Reference Include="GodotSharp">
       <HintPath>$(MSBuildProjectDirectory)/../.godot/packages/godotsharp/4.7.2/lib/net8.0/GodotSharp.dll</HintPath>
