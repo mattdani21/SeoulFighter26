@@ -38,7 +38,7 @@ namespace FirstFighter.Game
         // Key edge tracking
         private bool _prevF1, _prevF2, _prevF3, _prevF4, _prevF8, _prevF9, _prevSpace, _prevR;
         private bool _prevLeft, _prevRight, _prevUp, _prevDown;
-        private FighterMeshMode _globalMeshMode = FighterMeshMode.MeshyGlbWithGuardStatue;
+        private FighterMeshMode _globalMeshMode = FighterMeshMode.ProceduralRig;
 
         public override void _Ready()
         {
